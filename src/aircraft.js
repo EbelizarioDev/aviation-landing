@@ -5,6 +5,12 @@
 // and thrust spool delay come from the real envelope. Mass is the real empty-ish
 // operating mass in tonnes and drives response lag and stopping distance.
 //
+// Lateral handling numbers:
+//   rollRateDegS       - how fast full aileron rolls the aircraft
+//   rollStabilityDegS  - dihedral: how fast it rolls back to level when released
+//   maxSideslipDeg     - how much steady sideslip full rudder can hold
+//   betaResponsePerS   - how fast the aircraft reaches that sideslip
+//
 // Flap detents carry two factors used by the physics:
 //   lift - how much the detent lowers stall speed (1.0 = full landing flaps)
 //   drag - how much drag the detent adds (1.0 = full landing flaps, the baseline)
@@ -15,6 +21,10 @@ export const AIRCRAFT = [
   {
     id: 'c152',
     engines: 1,
+    rollRateDegS: 45,
+    rollStabilityDegS: 2.5,
+    maxSideslipDeg: 20,
+    betaResponsePerS: 2.0,
     name: 'Cessna 152',
     role: 'Trainer',
     kind: 'piston',
@@ -44,6 +54,10 @@ export const AIRCRAFT = [
   {
     id: 'c172',
     engines: 1,
+    rollRateDegS: 45,
+    rollStabilityDegS: 2.5,
+    maxSideslipDeg: 20,
+    betaResponsePerS: 2.0,
     name: 'Cessna 172S',
     role: 'Light single',
     kind: 'piston',
@@ -73,6 +87,10 @@ export const AIRCRAFT = [
   {
     id: 'c208',
     engines: 1,
+    rollRateDegS: 35,
+    rollStabilityDegS: 2.0,
+    maxSideslipDeg: 18,
+    betaResponsePerS: 1.8,
     name: 'Cessna 208B Grand Caravan',
     role: 'Single turboprop',
     kind: 'turboprop',
@@ -102,6 +120,10 @@ export const AIRCRAFT = [
   {
     id: 'b350',
     engines: 2,
+    rollRateDegS: 40,
+    rollStabilityDegS: 1.8,
+    maxSideslipDeg: 18,
+    betaResponsePerS: 1.6,
     name: 'Beechcraft King Air 350',
     role: 'Twin turboprop',
     kind: 'turboprop',
@@ -130,6 +152,10 @@ export const AIRCRAFT = [
   {
     id: 'e175',
     engines: 2,
+    rollRateDegS: 25,
+    rollStabilityDegS: 1.0,
+    maxSideslipDeg: 15,
+    betaResponsePerS: 1.4,
     name: 'Embraer E175',
     role: 'Regional jet',
     kind: 'jet',
@@ -160,6 +186,10 @@ export const AIRCRAFT = [
   {
     id: 'b738',
     engines: 2,
+    rollRateDegS: 22,
+    rollStabilityDegS: 0.9,
+    maxSideslipDeg: 15,
+    betaResponsePerS: 1.3,
     name: 'Boeing 737-800',
     role: 'Narrowbody jet',
     kind: 'jet',
@@ -190,6 +220,10 @@ export const AIRCRAFT = [
   {
     id: 'a388',
     engines: 4,
+    rollRateDegS: 18,
+    rollStabilityDegS: 0.8,
+    maxSideslipDeg: 15,
+    betaResponsePerS: 1.2,
     name: 'Airbus A380-800',
     role: 'Double-deck jet',
     kind: 'jet',

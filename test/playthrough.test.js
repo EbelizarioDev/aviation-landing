@@ -7,9 +7,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createGame } from '../src/game.js';
-import { alphaDeg, glidePathSinkFpm } from '../src/physics.js';
+import { autopilotInputs } from './helpers/autopilot.js';
 
-const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+
 
 /**
  * Flies the selected level to touchdown using nothing but key presses and
@@ -47,8 +47,6 @@ function flyLevel(index, { maxSeconds = 400 } = {}) {
     }
   };
 
-  const flareFt = aircraft.massT > 20 ? 80 : 50;
-  const touchdownSink = 150;
   let steps = 0;
 
   while (game.phase !== 'result' && steps++ < 60 * maxSeconds) {
@@ -62,24 +60,15 @@ function flyLevel(index, { maxSeconds = 400 } = {}) {
       continue;
     }
 
-    const groundKt = Math.max(30, s.groundSpeedKt ?? s.speedKt);
-    const pathSink = glidePathSinkFpm(groundKt);
-    const sinkTarget =
-      s.altFt < flareFt ? touchdownSink + (pathSink - touchdownSink) * (s.altFt / flareFt) : pathSink;
-
-    const gammaDeg = (-Math.asin(Math.min(0.9, sinkTarget / (s.speedKt * 101.27))) * 180) / Math.PI;
-    const pitchTarget = clamp(alphaDeg(aircraft, s.speedKt) + gammaDeg, 0, 20);
-    hold('ArrowUp', s.pitchDeg < pitchTarget - 0.3);
-    hold('ArrowDown', s.pitchDeg > pitchTarget + 0.3);
-
-    hold('KeyE', s.speedKt < aircraft.vrefKt - 1);
-    hold('KeyQ', s.speedKt > aircraft.vrefKt + 1);
-
-    const crabDeg =
-      (Math.asin(clamp(level.crosswindKt / Math.max(1, groundKt), -0.5, 0.5)) * 180) / Math.PI;
-    const steerTarget = clamp(-crabDeg - s.lateralFt / 250, -12, 12);
-    hold('ArrowRight', s.steerDeg < steerTarget - 0.2);
-    hold('ArrowLeft', s.steerDeg > steerTarget + 0.2);
+    const inputs = autopilotInputs(s, aircraft, level);
+    hold('KeyW', inputs.pitch > 0.01);
+    hold('KeyS', inputs.pitch < -0.01);
+    hold('KeyD', inputs.aileron > 0.01);
+    hold('KeyA', inputs.aileron < -0.01);
+    hold('KeyE', inputs.rudder > 0.01);
+    hold('KeyQ', inputs.rudder < -0.01);
+    hold('ArrowUp', inputs.throttleUp);
+    hold('ArrowDown', inputs.throttleDown);
 
     api.update(1 / 60);
   }

@@ -265,9 +265,19 @@ function drawGlidePath(ctx, x, y, w, h, state) {
   ctx.stroke();
 
   const dev = Math.round(pathDeviationFt(state));
-  text(ctx, `PATH ${dev > 0 ? '+' : ''}${dev} FT`, cx, y + h - 10, {
+  text(ctx, `PATH ${dev > 0 ? '+' : ''}${dev} FT`, cx, y + h - 26, {
     size: 11,
     color: onPath ? COLORS.green : COLORS.amber,
+    align: 'center',
+  });
+
+  // Nose against the runway axis: the de-crab lives or dies on this number.
+  const align = state.headingDeg ?? 0;
+  const alignColor =
+    Math.abs(align) <= 2 ? COLORS.green : Math.abs(align) <= 6 ? COLORS.amber : COLORS.red;
+  text(ctx, `ALIGN ${align > 0 ? '+' : ''}${align.toFixed(0)}°`, cx, y + h - 10, {
+    size: 11,
+    color: alignColor,
     align: 'center',
   });
   text(ctx, 'G/S · LOC', x + 6, y + 13, { size: 10, color: COLORS.dim });

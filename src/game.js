@@ -113,20 +113,25 @@ export function createGame({ storage = null } = {}) {
   function readControls(dt) {
     const state = game.state;
     const level = game.level;
-    const up = keys.has('ArrowUp') || keys.has('KeyW');
-    const down = keys.has('ArrowDown') || keys.has('KeyS');
-    const left = keys.has('ArrowLeft') || keys.has('KeyA');
-    const right = keys.has('ArrowRight') || keys.has('KeyD');
+    // W/S pitch, A/D aileron, Q/E rudder, arrows throttle. Pitch is never
+    // removed from an aircraft: without it there is no path and no flare.
+    const noseUp = keys.has('KeyW');
+    const noseDown = keys.has('KeyS');
+    const bankLeft = keys.has('KeyA');
+    const bankRight = keys.has('KeyD');
+    const yawLeft = keys.has('KeyQ');
+    const yawRight = keys.has('KeyE');
 
-    const throttleInput = (keys.has('KeyE') ? 1 : 0) - (keys.has('KeyQ') ? 1 : 0);
+    const throttleInput = (keys.has('ArrowUp') ? 1 : 0) - (keys.has('ArrowDown') ? 1 : 0);
     game.throttle = P.clamp(game.throttle + throttleInput * 0.5 * dt, 0, 1);
 
     const gustFpm =
       level.gustFpm * (Math.sin(game.t * 1.3) * 0.6 + Math.sin(game.t * 2.9 + 1) * 0.4);
 
     return {
-      pitch: (up ? 1 : 0) + (down ? -1 : 0),
-      steer: (left ? -1 : 0) + (right ? 1 : 0),
+      pitch: (noseUp ? 1 : 0) + (noseDown ? -1 : 0),
+      aileron: (bankRight ? 1 : 0) + (bankLeft ? -1 : 0),
+      rudder: (yawRight ? 1 : 0) + (yawLeft ? -1 : 0),
       throttle: game.throttle,
       brake: keys.has('Space') ? 1 : 0,
       reverse: keys.has('KeyB'),

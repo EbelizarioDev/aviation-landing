@@ -20,9 +20,10 @@ Opening `index.html` straight from the filesystem will not work.
 
 | Key | Action |
 | --- | --- |
-| `↑` / `↓` (or `W` / `S`) | Nose up / nose down |
-| `←` / `→` (or `A` / `D`) | Crab left / right |
-| `E` / `Q` | More / less power |
+| `W` / `S` | Nose up / nose down |
+| `A` / `D` | Aileron: bank left / right |
+| `Q` / `E` | Rudder: yaw left / right |
+| `↑` / `↓` | More / less power |
 | `F` / `V` | Flaps down / up one detent |
 | `G` | Gear up/down (retractable aircraft only) |
 | `X` | Spoilers (jets only) |
@@ -35,6 +36,14 @@ Opening `index.html` straight from the filesystem will not work.
 
 `C` only changes where you look from: the instrument panel and the minimap stay
 in both views, so nothing you need to read ever disappears.
+
+The aircraft flies a real lateral axis. A bank turns the flight path at
+`g·tan(phi)/V`, so correcting a drift is a planning problem: ten degrees of bank
+slides you 280 ft sideways in ten seconds. The rudder does not turn the aircraft
+— it points the nose off the flight path, which is how you **de-crab** at the
+flare: nose on the runway axis, sideslip holding the track. Banking also costs
+glide path (the vertical lift component falls by `1 - cos(phi)`) and raises the
+stall speed by `sqrt(1/cos(phi))`.
 
 Below 50 ft the panel shows `FLARE`: raise the nose until the sink dies out.
 Touching down at 700 fpm is a gear collapse even if you are perfectly aligned.
@@ -66,9 +75,11 @@ A landing fails when:
 - the speed is more than **10 kt** off the aircraft's reference speed;
 - the rollout runs off the end of the runway.
 
-Otherwise points come from sink rate, speed, lateral offset and how close the
-touchdown was to where a stabilised approach with a normal flare actually
-touches down (about 1600 ft past the threshold). 90 points is gold, 78 silver,
+Otherwise points come from sink rate, speed, lateral offset, nose alignment with
+the runway axis, and how close the touchdown was to where a stabilised approach
+with a normal flare actually touches down (about 1600 ft past the threshold).
+Alignment is scored, never fatal: touching down crabbed costs points and never
+collapses the gear. 90 points is gold, 78 silver,
 62 bronze.
 
 ## The physics, briefly
@@ -95,9 +106,9 @@ around 950 ft of geometry plus the flare, and not on the threshold itself.
 npm test        # node --test test/
 ```
 
-66 tests in five groups: the physics and grading, the projection math, a render
+81 tests in six groups: the physics and grading, the projection math, a render
 smoke test that draws every view on every level and phase through a stub canvas
-context, the camera view toggle, and an end-to-end playthrough that flies all
+context, the camera view toggle, the lateral model and alignment grading, and an end-to-end playthrough that flies all
 seven levels through the real keyboard input path and requires each to score a
 medal.
 

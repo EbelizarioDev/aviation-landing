@@ -23,7 +23,7 @@ export function aircraftScreenPose({ state, aircraft }) {
     y: VIEW.windshieldBottom - 70,
     horizonY,
     span: 64 + 60 * massFactor,
-    roll: clamp((state.steerDeg ?? 0) * PX_PER_DEG_ROLL, -12, 12),
+    roll: clamp((state.bankDeg ?? 0) * PX_PER_DEG_ROLL * 2, -30, 30),
   };
 }
 

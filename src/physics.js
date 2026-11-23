@@ -26,7 +26,11 @@ export const THRESHOLD_CROSSING_FT = 50;
 const GRAVITY_KT_S = 19.06;
 
 const PITCH_RATE_DEG_S = 18;
-const STEER_RATE_DEG_S = 4;
+const ROLL_RATE_DEG_S = 30;
+const ROLL_STABILITY_DEG_S = 2;
+const BETA_RESPONSE_PER_S = 1.5;
+const MAX_SIDESLIP_DEG = 15;
+export const MAX_BANK_DEG = 30;
 const GEAR_UP_DRAG_RELIEF = 0.88;
 const SPOILER_DRAG = 1.25;
 const STALL_DRAG = 2.5;
@@ -67,9 +71,11 @@ export function flapConfig(aircraft, flapIdx) {
   return aircraft.flaps[clamp(flapIdx, 0, aircraft.flaps.length - 1)];
 }
 
-/** Stall speed in the current flap configuration (1/sqrt(lift) scaling). */
-export function stallKt(aircraft, flapIdx) {
-  return aircraft.vsoKt / Math.sqrt(flapConfig(aircraft, flapIdx).lift);
+/** Stall speed in the current flap configuration (1/sqrt(lift) scaling).
+ *  A banked wing carries load: the stall speed rises with the load factor. */
+export function stallKt(aircraft, flapIdx, bankDeg = 0) {
+  const base = aircraft.vsoKt / Math.sqrt(flapConfig(aircraft, flapIdx).lift);
+  return base / Math.sqrt(Math.cos((clamp(bankDeg, -60, 60) * Math.PI) / 180));
 }
 
 /**
@@ -145,7 +151,10 @@ export function createState(aircraft, level) {
     gearDown,
     spoilers: false,
     lateralFt: 18,
-    steerDeg: 0,
+    bankDeg: 0,
+    chiDeg: 0,
+    headingDeg: 0,
+    betaDeg: 0,
     onGround: false,
     rollFt: 0,
     stalled: false,
@@ -159,7 +168,7 @@ export function createState(aircraft, level) {
 /**
  * One fixed-timestep integration step.
  *
- * controls: { pitch, throttle, steer, brake, reverse, spoilers,
+ * controls: { pitch, aileron, rudder, throttle, brake, reverse, spoilers,
  *             crosswindKt, headwindKt, gustFpm, wet }
  */
 export function step(aircraft, s, controls, dt) {
@@ -173,9 +182,39 @@ export function step(aircraft, s, controls, dt) {
   next.thrustCmd = throttle;
   next.thrust = stepThrust(s.thrust, throttle, aircraft.spoolS, dt);
 
-  // Stall is decided on the speed carried in from the previous step, so the
-  // attitude update can model the wing giving up: the nose falls on its own.
-  const vStall = stallKt(aircraft, s.flapIdx);
+  // --- lateral: the aileron banks, the bank turns, the rudder yaws the nose.
+  const aileron = clamp(controls.aileron ?? 0, -1, 1);
+  const rudder = clamp(controls.rudder ?? 0, -1, 1);
+  if (Math.abs(aileron) > 0.01) {
+    const rollRate = aircraft.rollRateDegS ?? ROLL_RATE_DEG_S;
+    next.bankDeg = clamp(s.bankDeg + aileron * rollRate * dt, -MAX_BANK_DEG, MAX_BANK_DEG);
+  } else {
+    // Dihedral: a stable aircraft rolls itself back toward level when let go.
+    const stability = aircraft.rollStabilityDegS ?? ROLL_STABILITY_DEG_S;
+    const relax = Math.min(Math.abs(s.bankDeg), stability * dt);
+    next.bankDeg = s.bankDeg - Math.sign(s.bankDeg) * relax;
+  }
+
+  // The bank turns the flight path. The rudder does not: it puts the nose off
+  // the flight path, which is what a de-crab is. Heading = path + sideslip.
+  const vMs = Math.max(25, s.speedKt * 0.514444);
+  const turnRateDegS =
+    ((9.81 * Math.tan((next.bankDeg * Math.PI) / 180)) / vMs) * (180 / Math.PI);
+  next.chiDeg = clamp(s.chiDeg + turnRateDegS * dt, -45, 45);
+
+  const betaMax = aircraft.maxSideslipDeg ?? MAX_SIDESLIP_DEG;
+  const betaWanted = rudder * betaMax;
+  const betaResponse = aircraft.betaResponsePerS ?? BETA_RESPONSE_PER_S;
+  next.betaDeg = clamp(
+    s.betaDeg + (betaWanted - s.betaDeg) * clamp(betaResponse * dt, 0, 1),
+    -betaMax,
+    betaMax,
+  );
+  next.headingDeg = clamp(next.chiDeg + next.betaDeg, -60, 60);
+
+  // Stall is decided on the speed carried in from the previous step, and a
+  // banked wing carries load, so the wing gives up sooner.
+  const vStall = stallKt(aircraft, s.flapIdx, next.bankDeg);
   next.stallKt = vStall;
   next.stalled = s.speedKt < vStall;
 
@@ -212,17 +251,15 @@ export function step(aircraft, s, controls, dt) {
 
   const vsi = verticalSpeedFpm(next.speedKt, next.gammaDeg);
   const gustFpm = controls.gustFpm ?? 0;
-  next.vsiFpm = vsi + gustFpm;
-  next.altFt = s.altFt + ((vsi + gustFpm) / 60) * dt;
+  // Banking costs glide path: the vertical component of lift falls by 1 - cos(phi).
+  const bankSink = Math.abs(vsi) * (1 / Math.cos((next.bankDeg * Math.PI) / 180) - 1);
+  next.vsiFpm = vsi - bankSink + gustFpm;
+  next.altFt = s.altFt + ((vsi - bankSink + gustFpm) / 60) * dt;
   next.distFt = s.distFt - horizontalFts(groundKt, next.gammaDeg) * dt;
 
-  next.steerDeg = clamp(
-    s.steerDeg + (controls.steer ?? 0) * STEER_RATE_DEG_S * dt,
-    -12,
-    12,
-  );
+  // Ground track = the flight path through the air, plus the wind.
   const driftFts =
-    groundKt * KT_TO_FTS * Math.sin(next.steerDeg * DEG) +
+    next.speedKt * KT_TO_FTS * Math.sin((next.chiDeg * Math.PI) / 180) +
     (controls.crosswindKt ?? 0) * KT_TO_FTS;
   next.lateralFt = s.lateralFt + driftFts * dt;
 
@@ -235,6 +272,8 @@ export function step(aircraft, s, controls, dt) {
       fpm: Math.abs(next.vsiFpm),
       speedKt: next.speedKt,
       lateralFt: next.lateralFt,
+      headingDeg: next.headingDeg,
+      betaDeg: next.betaDeg,
       pastThresholdFt: -next.distFt,
       rollFt: 0,
     };
@@ -261,9 +300,10 @@ function stepGround(aircraft, s, controls, dt) {
 
   const rollDelta = s.speedKt * KT_TO_FTS * dt;
   next.rollFt = s.rollFt + rollDelta;
+  // On the wheels the tyres absorb the nose alignment: a crabbed touchdown is
+  // graded, never fatal, so only a fraction of the crosswind scrubs sideways.
   next.lateralFt =
-    s.lateralFt +
-    ((controls.crosswindKt ?? 0) + s.speedKt * Math.sin(s.steerDeg * DEG)) * KT_TO_FTS * dt;
+    s.lateralFt + (controls.crosswindKt ?? 0) * 0.35 * KT_TO_FTS * dt;
 
   next.touchdown = s.touchdown
     ? { ...s.touchdown, rollFt: next.rollFt, endPastThresholdFt: s.touchdown.pastThresholdFt + next.rollFt }
@@ -338,12 +378,14 @@ export function classifyTouchdown(aircraft, level, td) {
   const tdzFt = touchdownZoneFt(aircraft, level);
   const idealFt = idealTouchdownFt();
   const speedDev = td.speedKt - aircraft.vrefKt;
+  const headingDev = td.headingDeg ?? 0;
   const base = {
     fpm: Math.round(td.fpm),
     speedKt: Math.round(td.speedKt),
     speedDev: Math.round(speedDev),
     pastThresholdFt: Math.round(td.pastThresholdFt),
     lateralFt: Math.round(td.lateralFt),
+    headingDev: Math.round(headingDev * 10) / 10,
     tdzFt: Math.round(tdzFt),
     runwayFt: Math.round(runwayFt),
   };
@@ -375,8 +417,11 @@ export function classifyTouchdown(aircraft, level, td) {
     Math.max(0, (Math.abs(td.lateralFt) - 10) / (RUNWAY_HALF_WIDTH_FT - 10)) * 20;
   const zoneError = Math.abs(td.pastThresholdFt - idealFt);
   const zonePenalty = Math.max(0, (zoneError - 500) / Math.max(1, tdzFt - 500)) * 25;
+  // Alignment is scored, never fatal: the nose should meet the runway axis, so
+  // the de-crab at the flare costs precision but can never collapse the gear.
+  const alignPenalty = Math.max(0, (Math.abs(headingDev) - 2) / 8) * 20;
   const points = Math.round(
-    clamp(100 - fpmPenalty - speedPenalty - latPenalty - zonePenalty, 1, 100),
+    clamp(100 - fpmPenalty - speedPenalty - latPenalty - zonePenalty - alignPenalty, 1, 100),
   );
 
   const medal = points >= 90 ? 'gold' : points >= 78 ? 'silver' : points >= 62 ? 'bronze' : 'rough';

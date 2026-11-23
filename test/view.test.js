@@ -81,7 +81,10 @@ test('a level still lands in third person', () => {
     pitchDeg: 8 + gammaDeg,
     pitchCmd: 8 + gammaDeg,
     lateralFt: 2,
-    steerDeg: 0,
+    bankDeg: 0,
+    chiDeg: 0,
+    headingDeg: 0,
+    betaDeg: 0,
     flapIdx: aircraft.flaps.length - 1,
     gearDown: true,
     onGround: false,
@@ -119,16 +122,16 @@ test('a heavier aircraft is drawn bigger', () => {
   assert.ok(heavy.span > light.span * 1.5, `${light.span} -> ${heavy.span}`);
 });
 
-test('steering banks the silhouette', () => {
+test('banking tilts the silhouette', () => {
   const aircraft = getAircraft('c172');
   const state = createState(aircraft, LEVELS[1]);
-  const level = aircraftScreenPose({ state: { ...state, steerDeg: 0 }, aircraft });
-  const right = aircraftScreenPose({ state: { ...state, steerDeg: 8 }, aircraft });
-  const left = aircraftScreenPose({ state: { ...state, steerDeg: -8 }, aircraft });
+  const level = aircraftScreenPose({ state: { ...state, bankDeg: 0 }, aircraft });
+  const right = aircraftScreenPose({ state: { ...state, bankDeg: 8 }, aircraft });
+  const left = aircraftScreenPose({ state: { ...state, bankDeg: -8 }, aircraft });
   assert.equal(level.roll, 0);
   assert.ok(right.roll > 0);
   assert.ok(left.roll < 0);
-  assert.ok(Math.abs(right.roll) <= 12);
+  assert.ok(Math.abs(right.roll) <= 30, `roll ${right.roll}`);
 });
 
 test('the horizon still follows pitch, so attitude stays readable', () => {

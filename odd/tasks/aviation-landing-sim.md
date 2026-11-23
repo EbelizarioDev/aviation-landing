@@ -49,11 +49,22 @@ behind and above the aircraft, and the choice survives a restart.
 | T4 | S2,S5 | Side-profile minimap with the 3° glidepath and deviation colouring | inline | `d57f4fc` |
 | T5 | S1,S7 | Game loop, input, level orchestration, touchdown scoring, screens | inline | `e5ca8b9` |
 | T6 | S5 | README with controls + final verification run | inline | `52819a9` |
-| T7 | S9 | Perspective toggle first person / third person | inline | |
+| T7 | S9 | Perspective toggle first person / third person | inline | `e402a29` |
 
-All seven tasks T1-T7 done. 54 tests green (`npm test`): physics and grading, projection
-math, a render smoke test over every level and phase, and a keyboard-driven
-playthrough of all seven levels that requires a medal on each.
+All seven tasks T1-T7 done. 66 tests green (`npm test`): physics and grading,
+projection math, a render smoke test over every view, level and phase, the view
+toggle, and a keyboard-driven playthrough of all seven levels that requires a
+medal on each.
+
+## Backlog (registered, not scheduled)
+
+These were raised by the user but deliberately not turned into tasks yet. They
+need a decision on scope before they become work.
+
+| ID | Idea | Raised in |
+|----|------|-----------|
+| B1 | Per-aircraft silhouette: the chase view draws one generic airframe, so a 737 and an A380 read the same. Needs per-type shapes (and it is the "is that really my aircraft?" problem). | L11 |
+| B2 | Height cue in third person: a shadow projected on the runway ahead (~300 ft), because a shadow under the aircraft would sit off the bottom of the windshield. | L10 |
 
 ## Log
 
@@ -89,3 +100,7 @@ shared through `render/scene.js` so the two views cannot disagree about the
 runway. A flying shadow was dropped on purpose: with the camera 24 ft above the
 aircraft the ground under it projects off the bottom of the windshield, so a
 shadow would have been a lie; height stays the minimap's job.
+
+L11 — "Se ve el avión. No es el modelo que representa pero se puede hacer después. Muestrame cual es el plan de trabajo que tenemos, quiero ver si hago algunas adecuaciones con ideas que se me ocurrieron hace un momento."
+
+L12 — From L11: the chase silhouette is acknowledged as generic and deferred by the user (backlog B1). The plan review is read-only: nothing was implemented or rescheduled in this turn except recording B1 and B2.

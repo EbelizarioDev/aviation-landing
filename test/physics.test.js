@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { AIRCRAFT, getAircraft } from '../src/aircraft.js';
 import { LEVELS, levelByNumber } from '../src/levels.js';
+import { autopilotInputs, integrateThrottle } from './helpers/autopilot.js';
 import {
   alphaDeg,
   classifyTouchdown,
@@ -257,54 +258,40 @@ function flyLevel(aircraft, level) {
   // The pilot runs the approach checklist before joining the path.
   for (let i = 0; i < aircraft.flaps.length; i++) s = setFlapSetting(aircraft, s, +1);
   s = setGearDown(aircraft, s, true);
+
+  let throttle = aircraft.thrustAtApproach;
   let t = 0;
-  const flareFt = 50;
-  const touchdownSink = 150;
-  const crosswindKt = level.crosswindKt;
   const controls = {
-    crosswindKt,
+    crosswindKt: level.crosswindKt,
     headwindKt: level.headwindKt,
     gustFpm: 0,
     wet: level.wet,
   };
 
-  const clampUnit = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
-
   while (t < 400 && !s.stopped) {
-    controls.pitch = 0;
-    controls.throttle = aircraft.thrustAtApproach;
-    controls.steer = 0;
-    controls.brake = 0;
-    controls.reverse = false;
-    controls.spoilers = false;
-
     if (!s.onGround) {
-      const speed = Math.max(30, s.groundSpeedKt ?? s.speedKt);
-      const pathSink = glidePathSinkFpm(speed);
-      const sinkTarget =
-        s.altFt < flareFt
-          ? touchdownSink + (pathSink - touchdownSink) * (s.altFt / flareFt)
-          : pathSink;
-      const gammaDeg = (-Math.asin(Math.min(0.9, sinkTarget / (s.speedKt * 101.27))) * 180) / Math.PI;
-      const pitchTarget = clampUnit(alphaDeg(aircraft, s.speedKt) + gammaDeg, 0, 20);
-      controls.pitch = clampUnit((pitchTarget - s.pitchDeg) * 3, -0.5, 0.5);
-      controls.throttle = clampUnit(
-        aircraft.thrustAtApproach - 0.03 * (s.speedKt - aircraft.vrefKt),
-        0,
-        1,
-      );
-      // Crab into the wind, then null the lateral error.
-      const crabDeg =
-        (Math.asin(Math.min(0.5, crosswindKt / Math.max(1, s.groundSpeedKt))) * 180) / Math.PI;
-      const steerTarget = clampUnit(-crabDeg - s.lateralFt / 250, -12, 12);
-      controls.steer = clampUnit((steerTarget - s.steerDeg) / 2, -1, 1);
+      const inputs = autopilotInputs(s, aircraft, level);
+      throttle = integrateThrottle(throttle, inputs, dt);
+      Object.assign(controls, {
+        pitch: inputs.pitch,
+        aileron: inputs.aileron,
+        rudder: inputs.rudder,
+        throttle,
+        brake: 0,
+        reverse: false,
+        spoilers: false,
+      });
     } else {
-      controls.brake = 1;
-      controls.reverse = true;
-      controls.spoilers = true;
-      controls.throttle = 0;
+      Object.assign(controls, {
+        pitch: 0,
+        aileron: 0,
+        rudder: 0,
+        throttle: 0,
+        brake: 1,
+        reverse: true,
+        spoilers: true,
+      });
     }
-
     s = step(aircraft, s, controls, dt);
     t += dt;
   }
@@ -352,8 +339,9 @@ test('an aircraft left nose-up with idle power stalls before the runway', () => 
   let s = createState(a, level);
   const controls = {
     pitch: 1,
+    aileron: 0,
+    rudder: 0,
     throttle: 0,
-    steer: 0,
     crosswindKt: 0,
     headwindKt: 0,
   };

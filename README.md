@@ -1,8 +1,8 @@
 # Aviation Landing
 
-Seven aircraft, one approach each. A browser landing simulator: cockpit view,
-an instrument panel, and a side-profile minimap that tells you whether you are
-high or low. No build step, no dependencies, no image or sound assets — every
+Seven aircraft, four skies, twenty-eight approaches. A browser landing simulator:
+cockpit view, an instrument panel, and a side-profile minimap that tells you
+whether you are high or low. No build step, no dependencies, no image or sound assets — every
 pixel is drawn with canvas primitives.
 
 ## Run it
@@ -33,6 +33,11 @@ Opening `index.html` straight from the filesystem will not work.
 | `P` | Pause |
 | `R` | Restart the level |
 | `Esc` | Back to the menu |
+
+In the menu: `↑`/`↓` choose the aircraft, `←`/`→` choose the weather, `ENTER`
+flies. Each aircraft only exposes the systems it actually has: press `G` on the
+C152 and it answers *"GEAR: FIXED ON THIS AIRCRAFT"* instead of doing nothing.
+Pitch and throttle are on every aircraft, because without them nothing flies.
 
 `C` only changes where you look from: the instrument panel and the minimap stay
 in both views, so nothing you need to read ever disappears.
@@ -65,9 +70,9 @@ flaps up). Configuring the aircraft is part of the job.
 
 ## Weather, the difficulty axis
 
-Weather is independent of the aircraft: four profiles, each one a different
-fight. A level carries a default profile, and the profile can be swapped without
-touching the aircraft.
+Weather is independent of the aircraft: four profiles, and any aircraft can fly
+any of them — 28 cells, each one with its own best medal. A level carries a
+default profile and the menu lets you overrule it.
 
 | Profile | Crosswind | Gusts | Visibility | Runway |
 | --- | --- | --- | --- | --- |
@@ -77,7 +82,9 @@ touching the aircraft.
 | Snow | 8 kt | 4 kt | 2 nm | contaminated (35% braking) |
 
 Gusts are deterministic and fade to nothing at the surface, so a bad touchdown
-is never a gust's fault. A profile whose crosswind is beyond the aircraft's
+is never a gust's fault. Every one of the 28 cells is flown by the keyboard
+playthrough in the test suite, which is what stops "harder" from meaning
+"impossible". A profile whose crosswind is beyond the aircraft's
 demonstrated limit is flagged in the briefing — the C152 in a storm is a bad
 idea in real life, and the game says so instead of pretending otherwise.
 
@@ -124,9 +131,10 @@ around 950 ft of geometry plus the flare, and not on the threshold itself.
 npm test        # node --test test/
 ```
 
-95 tests in seven groups: the physics and grading, the projection math, a render
+110 tests in eight groups: the physics and grading, the projection math, a render
 smoke test that draws every view on every level and phase through a stub canvas
-context, the camera view toggle, the lateral model and alignment grading, the weather profiles, and an end-to-end playthrough that flies all
+context, the camera view toggle, the lateral model and alignment grading, the weather profiles, the 28-cell matrix, the control map per aircraft, and an
+end-to-end playthrough that flies all
 seven levels through the real keyboard input path and requires each to score a
 medal.
 
@@ -138,7 +146,7 @@ src/aircraft.js       the seven-aircraft ladder, with real envelopes
 src/levels.js         one level per aircraft: runway, setup, weather, briefing
 src/weather.js        the four weather profiles, braking, gusts, visibility
 src/physics.js        flight model, glide path, touchdown grading
-src/game.js           game states, input, scoring, best results (DOM-free)
+src/game.js           game states, input, control map, scoring, per-cell bests
 src/main.js           canvas, keyboard and requestAnimationFrame wiring
 src/render/scene.js     sky, ground, runway, approach lights, PAPI (shared)
 src/render/cockpit.js   first person: the scene framed by the windshield
@@ -146,5 +154,6 @@ src/render/chase.js     third person: chase camera and the aircraft silhouette
 src/render/panel.js     instruments: attitude, tapes, VSI, glideslope/localizer
 src/render/minimap.js   the side profile with the glide path and your trend
 src/render/projection.js pure perspective math
-test/                 the four test groups
+test/                 eight test groups
+test/helpers/          canvas stub, autopilot, keyboard pilot
 ```

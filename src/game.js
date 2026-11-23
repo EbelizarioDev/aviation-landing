@@ -4,9 +4,33 @@
 import { getAircraft } from './aircraft.js';
 import { LEVELS } from './levels.js';
 import * as P from './physics.js';
-import { brakingFactor, getWeather, gustAt } from './weather.js';
+import { WEATHER, brakingFactor, getWeather, gustAt } from './weather.js';
 
 const BEST_KEY = 'aviation-landing.bests';
+
+/**
+ * The controls that actually do something on this aircraft. Anything absent is
+ * not fitted, and pressing its key says so instead of failing silently.
+ */
+export function controlsFor(aircraft) {
+  const controls = [
+    { key: 'W / S', action: 'Nose up / down' },
+    { key: 'A / D', action: 'Aileron: bank' },
+    { key: 'Q / E', action: 'Rudder: yaw' },
+    { key: '↑ / ↓', action: 'Throttle' },
+    { key: 'F / V', action: `Flaps (${aircraft.flaps.map((f) => f.label).join(' · ')})` },
+  ];
+  if (aircraft.gear === 'retractable') controls.push({ key: 'G', action: 'Gear up / down' });
+  if (aircraft.spoilers) controls.push({ key: 'X', action: 'Spoilers' });
+  controls.push({ key: 'Space', action: 'Brakes (on the ground)' });
+  if (aircraft.reverse) controls.push({ key: 'B', action: 'Reverse thrust (on the ground)' });
+  return controls;
+}
+
+/** Best results are stored per cell: one aircraft, one weather profile. */
+export function cellKeyFor(levelNumber, weatherId) {
+  return `${levelNumber}:${weatherId}`;
+}
 const FLAP_DOWN = 'KeyF';
 const FLAP_UP = 'KeyV';
 
@@ -24,6 +48,7 @@ export function createGame({ storage = null } = {}) {
     paused: false,
     view: 'cockpit',
     weatherId: null,
+    notice: null,
     t: 0,
     bests: loadBests(storage),
   };
@@ -33,7 +58,7 @@ export function createGame({ storage = null } = {}) {
     game.levelIndex = clamped;
     game.level = LEVELS[clamped];
     game.aircraft = getAircraft(game.level.aircraft);
-    game.weather = game.weatherId ? getWeather(game.weatherId) : game.level.weather;
+    game.weather = getWeather(selectedWeatherId(game));
     game.state = null;
     game.result = null;
     game.paused = false;
@@ -70,6 +95,12 @@ export function createGame({ storage = null } = {}) {
           game.levelIndex = (game.levelIndex + LEVELS.length - 1) % LEVELS.length;
         } else if (code === 'ArrowDown' || code === 'KeyS') {
           game.levelIndex = (game.levelIndex + 1) % LEVELS.length;
+        } else if (code === 'ArrowLeft' || code === 'ArrowRight') {
+          const step = code === 'ArrowLeft' ? -1 : 1;
+          const current = selectedWeatherId(game);
+          const index = WEATHER.findIndex((w) => w.id === current);
+          const next = (index + step + WEATHER.length) % WEATHER.length;
+          game.weatherId = WEATHER[next].id;
         } else if (code === 'Enter') {
           startLevel(game.levelIndex);
         }
@@ -87,12 +118,22 @@ export function createGame({ storage = null } = {}) {
           // Where you look from, not what you can read: allowed even when paused.
           game.view = game.view === 'cockpit' ? 'chase' : 'cockpit';
         } else if (!game.paused && game.state) {
-          if (code === FLAP_DOWN) game.state = P.setFlapSetting(game.aircraft, game.state, +1);
-          else if (code === FLAP_UP) game.state = P.setFlapSetting(game.aircraft, game.state, -1);
-          else if (code === 'KeyG') {
-            game.state = P.setGearDown(game.aircraft, game.state, !game.state.gearDown);
+          if (code === FLAP_DOWN) {
+            const before = game.state.flapIdx;
+            game.state = P.setFlapSetting(game.aircraft, game.state, +1);
+            if (game.state.flapIdx === before) notify('FLAPS: ALREADY FULL');
+          } else if (code === FLAP_UP) {
+            const before = game.state.flapIdx;
+            game.state = P.setFlapSetting(game.aircraft, game.state, -1);
+            if (game.state.flapIdx === before) notify('FLAPS: ALREADY UP');
+          } else if (code === 'KeyG') {
+            if (game.aircraft.gear !== 'retractable') notify('GEAR: FIXED ON THIS AIRCRAFT');
+            else game.state = P.setGearDown(game.aircraft, game.state, !game.state.gearDown);
           } else if (code === 'KeyX') {
-            game.state = P.setSpoilers(game.aircraft, game.state, !game.state.spoilers);
+            if (!game.aircraft.spoilers) notify('SPOILERS: NOT FITTED');
+            else game.state = P.setSpoilers(game.aircraft, game.state, !game.state.spoilers);
+          } else if (code === 'KeyB') {
+            if (!game.aircraft.reverse) notify('REVERSE: NOT FITTED');
           }
         }
         break;
@@ -104,6 +145,11 @@ export function createGame({ storage = null } = {}) {
       default:
         break;
     }
+  }
+
+  /** A control that does not apply answers instead of doing nothing. */
+  function notify(text) {
+    game.notice = { text, at: game.t };
   }
 
   function release(code) {
@@ -212,10 +258,11 @@ export function createGame({ storage = null } = {}) {
 
   function saveBest(levelNumber, grade) {
     const order = { gold: 3, silver: 2, bronze: 1, rough: 0 };
-    const prev = game.bests[levelNumber];
+    const key = cellKeyFor(levelNumber, game.weather.id);
+    const prev = game.bests[key];
     const prevScore = prev ? order[prev.medal] ?? 0 : -1;
     if ((order[grade.medal] ?? 0) <= prevScore) return;
-    game.bests[levelNumber] = { medal: grade.medal, points: grade.points };
+    game.bests[key] = { medal: grade.medal, points: grade.points };
     if (!storage) return;
     try {
       storage.setItem(BEST_KEY, JSON.stringify(game.bests));
@@ -224,8 +271,14 @@ export function createGame({ storage = null } = {}) {
     }
   }
 
+  function bestFor(levelNumber, weatherId) {
+    return game.bests[cellKeyFor(levelNumber, weatherId)];
+  }
+
   return {
     game,
+    bestFor,
+    notify,
     press,
     release,
     clearKeys,
@@ -239,9 +292,31 @@ export function createGame({ storage = null } = {}) {
 
 function loadBests(storage) {
   if (!storage) return {};
+  let parsed;
   try {
-    return JSON.parse(storage.getItem(BEST_KEY) ?? '{}') ?? {};
+    parsed = JSON.parse(storage.getItem(BEST_KEY) ?? '{}') ?? {};
   } catch {
     return {};
   }
+  // Older builds stored one medal per level number. Fold those into the cell
+  // the level's own profile occupies instead of dropping them.
+  for (const level of LEVELS) {
+    if (!parsed[level.n]) continue;
+    const key = cellKeyFor(level.n, level.weather.id);
+    if (!parsed[key]) parsed[key] = parsed[level.n];
+    delete parsed[level.n];
+  }
+  return parsed;
+}
+
+/** The profile the menu is pointing at: an explicit choice, else the level's own. */
+export function selectedWeatherId(game) {
+  // In the menu no level is loaded yet, so fall back to the highlighted row:
+  // the display must match what pressing ENTER will actually fly.
+  return (
+    game.weatherId ??
+    game.level?.weather?.id ??
+    LEVELS[game.levelIndex]?.weather?.id ??
+    WEATHER[0].id
+  );
 }

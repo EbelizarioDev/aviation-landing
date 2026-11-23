@@ -3,8 +3,8 @@
 
 import { getAircraft } from './aircraft.js';
 import { RUNWAY_HALF_WIDTH_FT } from './physics.js';
-import { beyondCrosswindLimit } from './weather.js';
-import { createGame } from './game.js';
+import { WEATHER, beyondCrosswindLimit, getWeather } from './weather.js';
+import { cellKeyFor, controlsFor, createGame, selectedWeatherId } from './game.js';
 import { VIEW, COLORS } from './render/layout.js';
 import { drawCockpit } from './render/cockpit.js';
 import { drawChase } from './render/chase.js';
@@ -88,6 +88,7 @@ function render() {
     drawMinimap(ctx, { state: game.state, aircraft: game.aircraft, level: game.level, weather: game.weather });
     drawPanel(ctx, { state: game.state, aircraft: game.aircraft, level: game.level, weather: game.weather, cues });
     if (game.phase === 'rollout') drawRolloutHint();
+    drawNotice();
   } else {
     ctx.fillStyle = '#07090b';
     ctx.fillRect(0, 0, VIEW.width, VIEW.height);
@@ -105,54 +106,85 @@ function render() {
 
 function drawMenu() {
   dim(0.82);
-  text('AVIATION LANDING', VIEW.width / 2, 92, {
-    size: 42,
+  const weatherId = selectedWeatherId(game);
+  const weather = getWeather(weatherId);
+
+  text('AVIATION LANDING', VIEW.width / 2, 78, {
+    size: 38,
     color: COLORS.marking,
     align: 'center',
   });
-  text('Seven aircraft. One approach each. Land it properly.', VIEW.width / 2, 124, {
-    size: 15,
+  text('Seven aircraft. Four skies. Land it properly.', VIEW.width / 2, 104, {
+    size: 14,
     color: COLORS.dim,
     align: 'center',
   });
 
-  let y = 176;
+  // --- aircraft axis
+  let y = 150;
   LEVELS.forEach((level, i) => {
     const aircraft = getAircraft(level.aircraft);
     const selected = i === game.levelIndex;
     if (selected) {
       ctx.fillStyle = 'rgba(90,209,232,0.12)';
-      ctx.fillRect(120, y - 20, VIEW.width - 240, 40);
+      ctx.fillRect(120, y - 18, VIEW.width - 240, 36);
       ctx.strokeStyle = COLORS.cyan;
       ctx.lineWidth = 1;
-      ctx.strokeRect(120.5, y - 19.5, VIEW.width - 241, 39);
+      ctx.strokeRect(120.5, y - 17.5, VIEW.width - 241, 35);
     }
     text(`${level.n}`, 140, y + 5, {
-      size: 18,
+      size: 16,
       color: selected ? COLORS.cyan : COLORS.dim,
       align: 'center',
     });
-    text(aircraft.name, 168, y, { size: 17, color: selected ? COLORS.marking : COLORS.text });
-    text(level.adds, 168, y + 15, { size: 11, color: COLORS.dim });
-    text(`${aircraft.vrefKt} KT`, VIEW.width - 190, y, {
-      size: 15,
-      color: COLORS.green,
-      align: 'right',
-    });
-    const best = game.bests[level.n];
-    text(best ? best.medal.toUpperCase() : '—', VIEW.width - 140, y, {
-      size: 14,
+    text(aircraft.name, 164, y, { size: 16, color: selected ? COLORS.marking : COLORS.text });
+    text(level.adds, 164, y + 13, { size: 10, color: COLORS.dim });
+    const best = game.bests[cellKeyFor(level.n, weatherId)];
+    text(best ? `${best.medal.toUpperCase()} ${best.points}` : '—', VIEW.width - 140, y + 2, {
+      size: 13,
       color: best ? medalColor(best.medal) : COLORS.dim,
       align: 'right',
     });
-    y += 52;
+    y += 42;
   });
 
-  text('↑ ↓ choose    ENTER fly', VIEW.width / 2, VIEW.height - 24, {
+  // --- weather axis
+  const chipY = 462;
+  const chipW = (VIEW.width - 260) / WEATHER.length - 10;
+  text('WEATHER', 120, chipY - 14, { size: 11, color: COLORS.cyan });
+  WEATHER.forEach((profile, i) => {
+    const cx = 120 + i * (chipW + 10);
+    const selected = profile.id === weatherId;
+    ctx.fillStyle = selected ? 'rgba(242,177,52,0.16)' : 'rgba(10,14,18,0.85)';
+    ctx.fillRect(cx, chipY, chipW, 62);
+    ctx.strokeStyle = selected ? COLORS.amber : COLORS.panelEdge;
+    ctx.lineWidth = selected ? 2 : 1;
+    ctx.strokeRect(cx + 0.5, chipY + 0.5, chipW - 1, 61);
+    text(profile.name, cx + 10, chipY + 20, {
+      size: 15,
+      color: selected ? COLORS.amber : COLORS.text,
+    });
+    text(profile.tagline, cx + 10, chipY + 36, { size: 9, color: COLORS.dim });
+    text(
+      `${profile.crosswindKt} KT XW · ${profile.runway.toUpperCase()}`,
+      cx + 10,
+      chipY + 52,
+      { size: 10, color: selected ? COLORS.amber : COLORS.dim },
+    );
+  });
+
+  text('↑ ↓ aircraft    ← → weather    ENTER fly', VIEW.width / 2, VIEW.height - 26, {
     size: 14,
     color: COLORS.text,
     align: 'center',
   });
+  if (beyondCrosswindLimit(getAircraft(LEVELS[game.levelIndex].aircraft), weather)) {
+    text('this crosswind is beyond that aircraft\'s demonstrated limit', VIEW.width / 2, VIEW.height - 46, {
+      size: 12,
+      color: COLORS.red,
+      align: 'center',
+    });
+  }
 }
 
 function drawBriefing() {
@@ -215,7 +247,36 @@ function drawBriefing() {
     text(line, x + 18, y + i * 21, { size: 14, color: COLORS.text });
   });
 
+  y += checklist.length * 21 + 12;
+  text('CONTROLS ON THIS AIRCRAFT', x, y, { size: 11, color: COLORS.cyan });
+  const controls = controlsFor(aircraft);
+  controls.forEach((control, i) => {
+    const cy = y + 20 + i * 17;
+    if (cy > VIEW.height - 42) return;
+    text(control.key, x + 4, cy, { size: 12, color: COLORS.amber });
+    text(control.action, x + 90, cy, { size: 12, color: COLORS.text });
+  });
+
   text('ENTER fly    ESC back', x, VIEW.height - 40, { size: 14, color: COLORS.dim });
+}
+
+function drawNotice() {
+  if (!game.notice) return;
+  const age = game.t - game.notice.at;
+  if (age > 2.5) return;
+  const alpha = age > 2 ? 1 - (age - 2) / 0.5 : 1;
+  ctx.globalAlpha = Math.max(0, alpha);
+  ctx.fillStyle = 'rgba(8,12,16,0.85)';
+  ctx.fillRect(VIEW.width / 2 - 170, 300, 340, 30);
+  ctx.strokeStyle = COLORS.amber;
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(VIEW.width / 2 - 169.5, 300.5, 339, 29);
+  text(game.notice.text, VIEW.width / 2, 320, {
+    size: 14,
+    color: COLORS.amber,
+    align: 'center',
+  });
+  ctx.globalAlpha = 1;
 }
 
 function drawRolloutHint() {
@@ -239,6 +300,11 @@ function drawResult() {
   const cx = VIEW.width / 2;
   const color = r.ok ? medalColor(r.medal) : COLORS.red;
 
+  text(`${game.aircraft.name} · ${game.weather.name}`, cx, 62, {
+    size: 13,
+    color: COLORS.dim,
+    align: 'center',
+  });
   text(r.ok ? 'LANDED' : 'FAILED', cx, 108, {
     size: 44,
     color: r.ok ? COLORS.marking : COLORS.red,

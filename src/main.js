@@ -6,6 +6,7 @@ import { RUNWAY_HALF_WIDTH_FT } from './physics.js';
 import { createGame } from './game.js';
 import { VIEW, COLORS } from './render/layout.js';
 import { drawCockpit } from './render/cockpit.js';
+import { drawChase } from './render/chase.js';
 import { drawPanel } from './render/panel.js';
 import { drawMinimap } from './render/minimap.js';
 
@@ -27,6 +28,7 @@ const HANDLED = new Set([
   'KeyG',
   'KeyX',
   'KeyB',
+  'KeyC',
   'KeyN',
   'KeyP',
   'KeyR',
@@ -77,7 +79,11 @@ function render() {
       stall: game.state.stalled,
       flare: !game.state.onGround && game.state.altFt < 50,
     };
-    drawCockpit(ctx, { state: game.state, aircraft: game.aircraft, level: game.level });
+    if (game.view === 'chase') {
+      drawChase(ctx, { state: game.state, aircraft: game.aircraft, level: game.level });
+    } else {
+      drawCockpit(ctx, { state: game.state, aircraft: game.aircraft, level: game.level });
+    }
     drawMinimap(ctx, { state: game.state, aircraft: game.aircraft, level: game.level });
     drawPanel(ctx, { state: game.state, aircraft: game.aircraft, level: game.level, cues });
     if (game.phase === 'rollout') drawRolloutHint();

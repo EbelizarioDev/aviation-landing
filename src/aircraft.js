@@ -14,6 +14,7 @@
 export const AIRCRAFT = [
   {
     id: 'c152',
+    engines: 1,
     name: 'Cessna 152',
     role: 'Trainer',
     kind: 'piston',
@@ -42,6 +43,7 @@ export const AIRCRAFT = [
   },
   {
     id: 'c172',
+    engines: 1,
     name: 'Cessna 172S',
     role: 'Light single',
     kind: 'piston',
@@ -70,6 +72,7 @@ export const AIRCRAFT = [
   },
   {
     id: 'c208',
+    engines: 1,
     name: 'Cessna 208B Grand Caravan',
     role: 'Single turboprop',
     kind: 'turboprop',
@@ -98,6 +101,7 @@ export const AIRCRAFT = [
   },
   {
     id: 'b350',
+    engines: 2,
     name: 'Beechcraft King Air 350',
     role: 'Twin turboprop',
     kind: 'turboprop',
@@ -125,6 +129,7 @@ export const AIRCRAFT = [
   },
   {
     id: 'e175',
+    engines: 2,
     name: 'Embraer E175',
     role: 'Regional jet',
     kind: 'jet',
@@ -154,6 +159,7 @@ export const AIRCRAFT = [
   },
   {
     id: 'b738',
+    engines: 2,
     name: 'Boeing 737-800',
     role: 'Narrowbody jet',
     kind: 'jet',
@@ -183,6 +189,7 @@ export const AIRCRAFT = [
   },
   {
     id: 'a388',
+    engines: 4,
     name: 'Airbus A380-800',
     role: 'Double-deck jet',
     kind: 'jet',

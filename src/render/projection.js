@@ -11,13 +11,14 @@ export const FOCAL_PX = 520;
 export const PX_PER_DEG = 9.5;
 const NEAR_FT = 8;
 
-export function makeCamera(state, { cx, horizonY }) {
+export function makeCamera(state, { cx, horizonY, altOffsetFt = 0, zApronFt = 0 }) {
   return {
     cx,
     horizonY: horizonY + state.pitchDeg * PX_PER_DEG,
-    altFt: Math.max(0, state.altFt),
+    altFt: Math.max(0, state.altFt) + altOffsetFt,
     offsetFt: state.lateralFt ?? 0,
     focal: FOCAL_PX,
+    zApronFt,
   };
 }
 
@@ -28,7 +29,7 @@ export function makeCamera(state, { cx, horizonY }) {
  * zFt: distance ahead of the aircraft along the runway axis.
  */
 export function project(cam, worldXFt, worldYFt, zFt) {
-  const z = Math.max(NEAR_FT, zFt);
+  const z = Math.max(NEAR_FT, zFt + (cam.zApronFt ?? 0));
   return {
     x: cam.cx + ((worldXFt - cam.offsetFt) * cam.focal) / z,
     y: cam.horizonY + ((cam.altFt - worldYFt) * cam.focal) / z,

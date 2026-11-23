@@ -20,6 +20,7 @@ export function createGame({ storage = null } = {}) {
     result: null,
     throttle: 0.45,
     paused: false,
+    view: 'cockpit',
     t: 0,
     bests: loadBests(storage),
   };
@@ -78,7 +79,10 @@ export function createGame({ storage = null } = {}) {
         if (code === 'KeyP') game.paused = !game.paused;
         else if (code === 'KeyR') startLevel(game.levelIndex);
         else if (code === 'Escape') toMenu();
-        else if (!game.paused && game.state) {
+        else if (code === 'KeyC') {
+          // Where you look from, not what you can read: allowed even when paused.
+          game.view = game.view === 'cockpit' ? 'chase' : 'cockpit';
+        } else if (!game.paused && game.state) {
           if (code === FLAP_DOWN) game.state = P.setFlapSetting(game.aircraft, game.state, +1);
           else if (code === FLAP_UP) game.state = P.setFlapSetting(game.aircraft, game.state, -1);
           else if (code === 'KeyG') {

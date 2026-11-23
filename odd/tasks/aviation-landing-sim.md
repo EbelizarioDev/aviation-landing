@@ -34,6 +34,11 @@ aligned with the centreline is a scored landing with a medal.
 S8 — Pure math (glide slope, required sink rate, touchdown classification, thrust spool,
 stall) is unit tested with `node --test`.
 
+S9 — The view can be switched between first person (cockpit) and third person.
+The instruments stay in both views: the perspective changes where you look from,
+not what you can read. Implemented with `C`; third person is a chase camera
+behind and above the aircraft, and the choice survives a restart.
+
 ## Tasks
 
 | ID | Spec | Work | Route | Commit |
@@ -44,8 +49,9 @@ stall) is unit tested with `node --test`.
 | T4 | S2,S5 | Side-profile minimap with the 3° glidepath and deviation colouring | inline | `d57f4fc` |
 | T5 | S1,S7 | Game loop, input, level orchestration, touchdown scoring, screens | inline | `e5ca8b9` |
 | T6 | S5 | README with controls + final verification run | inline | `52819a9` |
+| T7 | S9 | Perspective toggle first person / third person | inline | |
 
-All six tasks done. 54 tests green (`npm test`): physics and grading, projection
+All seven tasks T1-T7 done. 54 tests green (`npm test`): physics and grading, projection
 math, a render smoke test over every level and phase, and a keyboard-driven
 playthrough of all seven levels that requires a medal on each.
 
@@ -71,3 +77,15 @@ L7 — Implementation decisions recorded while building:
 - Closed-loop autopilots found two real bugs: `createState` did not seed `groundSpeedKt` (NaN lateral drift) and `finish()` crashed when the approach flew past the runway without a touchdown record.
 - Approach lengths trimmed to 2.0-4.5 nm after the playthrough measured 3-4 minutes per attempt, too long for the stated "pass the time" purpose. Now ~2 minutes.
 - Levels 2-7 start unconfigured (flaps up, gear up on retractable) so configuring is part of the work.
+
+L8 — "De momento vamos a probar todo con el nivel 1. Antes de probarlo necesito saber los controles. Agrega una funcionalidad de cambio de perspectiva de primer persona a tercera, solamente registralo, lo hacemos después."
+
+L9 — Scope decision: L8 asks for the perspective toggle to be *registered only*. Recorded as S9 and task T7 (pending). No code written for it in this turn; the user will call it when they want it built. Testing this session stays on level 1.
+
+L10 — T7 built on the user's request. Small path, test-first: the new view tests
+went red on a missing module, then green. `C` toggles the view and is allowed
+even while paused; the preference survives restart and level change. Geometry is
+shared through `render/scene.js` so the two views cannot disagree about the
+runway. A flying shadow was dropped on purpose: with the camera 24 ft above the
+aircraft the ground under it projects off the bottom of the windshield, so a
+shadow would have been a lie; height stays the minimap's job.

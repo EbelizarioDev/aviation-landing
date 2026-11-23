@@ -26,11 +26,15 @@ Opening `index.html` straight from the filesystem will not work.
 | `F` / `V` | Flaps down / up one detent |
 | `G` | Gear up/down (retractable aircraft only) |
 | `X` | Spoilers (jets only) |
+| `C` | Switch view: cockpit / chase camera |
 | `Space` | Wheel brakes (hold, on the ground) |
 | `B` | Reverse thrust (hold, on the ground) |
 | `P` | Pause |
 | `R` | Restart the level |
 | `Esc` | Back to the menu |
+
+`C` only changes where you look from: the instrument panel and the minimap stay
+in both views, so nothing you need to read ever disappears.
 
 Below 50 ft the panel shows `FLARE`: raise the nose until the sink dies out.
 Touching down at 700 fpm is a gear collapse even if you are perfectly aligned.
@@ -91,10 +95,11 @@ around 950 ft of geometry plus the flare, and not on the threshold itself.
 npm test        # node --test test/
 ```
 
-54 tests in four groups: the physics and grading, the projection math, a render
-smoke test that draws all three views on every level and phase through a stub
-canvas context, and an end-to-end playthrough that flies all seven levels
-through the real keyboard input path and requires each to score a medal.
+66 tests in five groups: the physics and grading, the projection math, a render
+smoke test that draws every view on every level and phase through a stub canvas
+context, the camera view toggle, and an end-to-end playthrough that flies all
+seven levels through the real keyboard input path and requires each to score a
+medal.
 
 ## Layout
 
@@ -105,7 +110,9 @@ src/levels.js         one level per aircraft: runway, wind, setup, briefing
 src/physics.js        flight model, glide path, touchdown grading
 src/game.js           game states, input, scoring, best results (DOM-free)
 src/main.js           canvas, keyboard and requestAnimationFrame wiring
-src/render/cockpit.js   windshield: runway in perspective, approach lights, PAPI
+src/render/scene.js     sky, ground, runway, approach lights, PAPI (shared)
+src/render/cockpit.js   first person: the scene framed by the windshield
+src/render/chase.js     third person: chase camera and the aircraft silhouette
 src/render/panel.js     instruments: attitude, tapes, VSI, glideslope/localizer
 src/render/minimap.js   the side profile with the glide path and your trend
 src/render/projection.js pure perspective math

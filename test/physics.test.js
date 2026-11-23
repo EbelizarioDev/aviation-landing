@@ -262,10 +262,10 @@ function flyLevel(aircraft, level) {
   let throttle = aircraft.thrustAtApproach;
   let t = 0;
   const controls = {
-    crosswindKt: level.crosswindKt,
-    headwindKt: level.headwindKt,
+    crosswindKt: level.weather.crosswindKt,
+    headwindKt: level.weather.headwindKt,
     gustFpm: 0,
-    wet: level.wet,
+    brakingFactor: level.weather.runway === 'dry' ? 1 : 0.62,
   };
 
   while (t < 400 && !s.stopped) {

@@ -3,6 +3,7 @@
 
 import { FEET_PER_M, RUNWAY_HALF_WIDTH_FT } from '../physics.js';
 import { VIEW, COLORS } from './layout.js';
+import { hazeAmount } from '../weather.js';
 import { makeCamera, project, papiWhiteCount } from './projection.js';
 
 const HALF_WIDTH_FT = RUNWAY_HALF_WIDTH_FT;
@@ -14,7 +15,7 @@ const APPROACH_LIGHT_SPACING_FT = 200;
  * altOffsetFt lifts the eye above the aircraft (chase camera);
  * zApronFt pushes every projected point that much further away (camera behind).
  */
-export function paintExterior(ctx, { state, aircraft, level }, options = {}) {
+export function paintExterior(ctx, { state, aircraft, level, weather, t = 0 }, options = {}) {
   const w = VIEW.width;
   const h = VIEW.windshieldBottom;
   const cam = makeCamera(state, {
@@ -26,8 +27,10 @@ export function paintExterior(ctx, { state, aircraft, level }, options = {}) {
 
   drawSky(ctx, cam, w, h);
   drawGround(ctx, cam, w, h);
-  drawRunway(ctx, cam, state, aircraft, level);
+  drawRunway(ctx, cam, state, aircraft, level, weather);
   drawApproachLights(ctx, cam, state, level);
+  drawHaze(ctx, weather, w, h);
+  drawPrecipitation(ctx, weather, t, w, h);
   return cam;
 }
 
@@ -84,7 +87,8 @@ function drawGround(ctx, cam, w, h) {
   ctx.stroke();
 }
 
-function drawRunway(ctx, cam, state, aircraft, level) {
+function drawRunway(ctx, cam, state, aircraft, level, weather = {}) {
+  const surface = weather.runway ?? (level.wet ? 'wet' : 'dry');
   const runwayFt = (level.runwayM ?? aircraft.runwayM) * FEET_PER_M;
   const thresholdZ = state.distFt;
   const zNear = Math.max(8, thresholdZ);
@@ -96,7 +100,8 @@ function drawRunway(ctx, cam, state, aircraft, level) {
   const farL = project(cam, -HALF_WIDTH_FT, 0, zFar);
   const farR = project(cam, HALF_WIDTH_FT, 0, zFar);
 
-  ctx.fillStyle = level.wet ? COLORS.runwayWet : COLORS.runway;
+  ctx.fillStyle =
+    surface === 'snow' ? COLORS.runwaySnow : surface === 'wet' ? COLORS.runwayWet : COLORS.runway;
   ctx.beginPath();
   ctx.moveTo(nearL.x, nearL.y);
   ctx.lineTo(nearR.x, nearR.y);
@@ -105,7 +110,7 @@ function drawRunway(ctx, cam, state, aircraft, level) {
   ctx.closePath();
   ctx.fill();
 
-  if (level.wet) {
+  if (surface === 'wet') {
     ctx.fillStyle = 'rgba(160,190,205,0.16)';
     const c1 = project(cam, 0, 0, zNear);
     const c2 = project(cam, 0, 0, zFar);
@@ -118,8 +123,9 @@ function drawRunway(ctx, cam, state, aircraft, level) {
     ctx.fill();
   }
 
-  // Threshold stripes, anchored at the threshold, not at the aircraft.
-  ctx.fillStyle = COLORS.marking;
+  // Threshold stripes, anchored at the threshold, not at the aircraft. On snow
+  // the paint needs the opposite contrast to stay visible.
+  ctx.fillStyle = surface === 'snow' ? COLORS.markingSnow : COLORS.marking;
   const stripeStart = Math.max(8, thresholdZ);
   const stripeEnd = Math.max(stripeStart + 20, thresholdZ + 100);
   for (let i = 0; i < 8; i++) {
@@ -129,7 +135,7 @@ function drawRunway(ctx, cam, state, aircraft, level) {
   }
 
   // Centreline dashes, then the aiming point bars: "put the wheels here".
-  ctx.fillStyle = COLORS.marking;
+  ctx.fillStyle = surface === 'snow' ? COLORS.markingSnow : COLORS.marking;
   for (let z = thresholdZ + 220; z + 120 < zFar; z += 320) {
     if (z < 8) continue;
     quad(ctx, cam, -2.5, 2.5, z, z + 120, 0.75);
@@ -137,7 +143,7 @@ function drawRunway(ctx, cam, state, aircraft, level) {
 
   const aimZ = thresholdZ + 1200;
   if (aimZ + 150 < zFar) {
-    ctx.fillStyle = COLORS.marking;
+    ctx.fillStyle = surface === 'snow' ? COLORS.markingSnow : COLORS.marking;
     quad(ctx, cam, -26, -18, aimZ, aimZ + 150);
     quad(ctx, cam, 18, 26, aimZ, aimZ + 150);
   }
@@ -175,6 +181,59 @@ function drawApproachLights(ctx, cam, state, level) {
       ctx.fillStyle = i < whites ? COLORS.papiWhite : COLORS.papiRed;
       ctx.fillRect(x - size / 2, p.y - size / 2, size * 0.85, size);
     }
+  }
+}
+
+/**
+ * Low visibility is drawn, not hidden: if you cannot see the runway, the panel
+ * and the minimap have to carry you, so the haze never fully hides it.
+ */
+function drawHaze(ctx, weather, w, h) {
+  const amount = hazeAmount(weather ?? {});
+  if (amount <= 0) return;
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, `rgba(196,204,210,${amount * 0.55})`);
+  grad.addColorStop(1, `rgba(214,220,224,${amount * 0.85})`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+}
+
+function hash01(n) {
+  const x = Math.sin(n * 127.1) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+/** Rain or snow, slanted by the wind so the direction is readable. */
+function drawPrecipitation(ctx, weather, t, w, h) {
+  const precip = weather?.precip ?? 'none';
+  if (precip === 'none') return;
+  const slant = (weather.crosswindKt ?? 0) * (precip === 'rain' ? 3.2 : 1.6);
+  const count = precip === 'rain' ? 150 : 110;
+
+  if (precip === 'rain') {
+    ctx.strokeStyle = 'rgba(198,222,236,0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < count; i++) {
+      const rx = hash01(i + 1);
+      const speed = 900 + hash01(i + 91) * 500;
+      const x = (((rx * w + t * slant) % w) + w) % w;
+      const y = ((hash01(i + 41) * h + t * speed) % h + h) % h;
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - slant * 0.35, y + 16);
+    }
+    ctx.stroke();
+    return;
+  }
+
+  ctx.fillStyle = 'rgba(245,248,250,0.85)';
+  for (let i = 0; i < count; i++) {
+    const rx = hash01(i + 3);
+    const speed = 120 + hash01(i + 57) * 90;
+    const x = (((rx * w + t * slant) % w) + w) % w;
+    const y = ((hash01(i + 23) * h + t * speed) % h + h) % h;
+    const size = 1.5 + hash01(i + 77) * 2;
+    ctx.fillRect(x, y, size, size);
   }
 }
 

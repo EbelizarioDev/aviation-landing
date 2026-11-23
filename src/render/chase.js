@@ -27,13 +27,13 @@ export function aircraftScreenPose({ state, aircraft }) {
   };
 }
 
-export function drawChase(ctx, { state, aircraft, level }) {
+export function drawChase(ctx, { state, aircraft, level, weather, t }) {
   ctx.save();
   ctx.beginPath();
   ctx.rect(0, 0, VIEW.width, VIEW.windshieldBottom);
   ctx.clip();
 
-  paintExterior(ctx, { state, aircraft, level }, {
+  paintExterior(ctx, { state, aircraft, level, weather, t }, {
     altOffsetFt: CAMERA_HEIGHT_FT,
     zApronFt: CAMERA_BEHIND_FT,
   });

@@ -6,7 +6,7 @@ import { FEET_PER_NM, glidePathAltFt } from '../physics.js';
 import { VIEW, COLORS } from './layout.js';
 import { pathDeviationFt } from './projection.js';
 
-export function drawMinimap(ctx, { state, aircraft, level }) {
+export function drawMinimap(ctx, { state, aircraft, level, weather }) {
   const { x, y, w, h } = VIEW.minimap;
   const padLeft = 26;
   const padBottom = 18;
@@ -115,6 +115,31 @@ export function drawMinimap(ctx, { state, aircraft, level }) {
   ctx.fill();
 
   // Readouts.
+  // Wind: direction and strength, because a crosswind you cannot see is a trap.
+  if (weather && weather.crosswindKt !== 0) {
+    const magnitude = Math.min(1, Math.abs(weather.crosswindKt) / 20);
+    const arrowLen = 10 + magnitude * 14;
+    const ax0 = x + 8;
+    const ay0 = y + 24;
+    ctx.strokeStyle = COLORS.amber;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(ax0, ay0);
+    ctx.lineTo(ax0 + arrowLen * Math.sign(weather.crosswindKt), ay0);
+    ctx.stroke();
+    ctx.beginPath();
+    const tipX = ax0 + arrowLen * Math.sign(weather.crosswindKt);
+    ctx.moveTo(tipX, ay0);
+    ctx.lineTo(tipX - 4 * Math.sign(weather.crosswindKt), ay0 - 3);
+    ctx.lineTo(tipX - 4 * Math.sign(weather.crosswindKt), ay0 + 3);
+    ctx.closePath();
+    ctx.fillStyle = COLORS.amber;
+    ctx.fill();
+    ctx.fillStyle = COLORS.amber;
+    ctx.font = '600 9px ui-monospace, monospace';
+    ctx.fillText(`${Math.round(Math.abs(weather.crosswindKt))}KT XW`, x + 8, y + 40);
+  }
+
   ctx.fillStyle = COLORS.text;
   ctx.font = '600 9px ui-monospace, monospace';
   ctx.fillText('APPROACH PROFILE', x + 6, y + 12);

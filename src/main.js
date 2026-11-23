@@ -3,6 +3,7 @@
 
 import { getAircraft } from './aircraft.js';
 import { RUNWAY_HALF_WIDTH_FT } from './physics.js';
+import { beyondCrosswindLimit } from './weather.js';
 import { createGame } from './game.js';
 import { VIEW, COLORS } from './render/layout.js';
 import { drawCockpit } from './render/cockpit.js';
@@ -80,12 +81,12 @@ function render() {
       flare: !game.state.onGround && game.state.altFt < 50,
     };
     if (game.view === 'chase') {
-      drawChase(ctx, { state: game.state, aircraft: game.aircraft, level: game.level });
+      drawChase(ctx, { state: game.state, aircraft: game.aircraft, level: game.level, weather: game.weather, t: game.t });
     } else {
-      drawCockpit(ctx, { state: game.state, aircraft: game.aircraft, level: game.level });
+      drawCockpit(ctx, { state: game.state, aircraft: game.aircraft, level: game.level, weather: game.weather, t: game.t });
     }
-    drawMinimap(ctx, { state: game.state, aircraft: game.aircraft, level: game.level });
-    drawPanel(ctx, { state: game.state, aircraft: game.aircraft, level: game.level, cues });
+    drawMinimap(ctx, { state: game.state, aircraft: game.aircraft, level: game.level, weather: game.weather });
+    drawPanel(ctx, { state: game.state, aircraft: game.aircraft, level: game.level, weather: game.weather, cues });
     if (game.phase === 'rollout') drawRolloutHint();
   } else {
     ctx.fillStyle = '#07090b';
@@ -171,7 +172,21 @@ function drawBriefing() {
     color: COLORS.dim,
   });
 
-  y += 46;
+  const weather = game.weather;
+  y += 28;
+  text('WEATHER', x, y, { size: 11, color: COLORS.cyan });
+  text(`${weather.name} — ${weather.tagline}`, x + 76, y, { size: 15, color: COLORS.amber });
+  if (beyondCrosswindLimit(aircraft, weather)) {
+    y += 20;
+    text(
+      `CROSSWIND BEYOND DEMONSTRATED LIMIT (${weather.crosswindKt} KT > ${aircraft.maxCrosswindKt} KT)`,
+      x + 76,
+      y,
+      { size: 12, color: COLORS.red },
+    );
+  }
+
+  y += 30;
   text('NEW', x, y, { size: 11, color: COLORS.cyan });
   text(level.adds, x + 48, y, { size: 16, color: COLORS.amber });
 

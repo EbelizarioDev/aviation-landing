@@ -15,6 +15,8 @@ export const COLORS = {
   groundFar: '#5a6449',
   runway: '#2c3034',
   runwayWet: '#1e2427',
+  runwaySnow: '#b8bfc2',
+  markingSnow: '#6c7679',
   marking: '#eceff1',
   edgeLight: '#f8f2c4',
   papiRed: '#e2402f',

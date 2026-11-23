@@ -97,9 +97,20 @@ test('a level can be failed on purpose, so the grade is not always a medal', () 
   const api = createGame({ storage: null });
   api.startLevel(5);
   api.begin();
-  // Dive at the runway with the nose down and full power.
+
+  // The remap is real: arrows carry throttle now, they no longer pitch.
+  const pitchBefore = api.game.state.pitchDeg;
   api.press('ArrowDown');
-  api.press('KeyE');
+  for (let i = 0; i < 20; i++) api.update(1 / 60);
+  assert.ok(
+    Math.abs(api.game.state.pitchDeg - pitchBefore) < 0.5,
+    `pitch moved to ${api.game.state.pitchDeg}`,
+  );
+  api.release('ArrowDown');
+
+  // Dive at the runway: nose down with S, power up with the up arrow.
+  api.press('KeyS');
+  api.press('ArrowUp');
   let steps = 0;
   while (api.game.phase !== 'result' && steps++ < 60 * 200) api.update(1 / 60);
   assert.equal(api.game.phase, 'result');

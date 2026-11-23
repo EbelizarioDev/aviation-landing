@@ -32,7 +32,7 @@ function placeOnShortFinal(api, { sinkFpm = 150, distFt = -1600, ...overrides } 
     altFt: 0.6,
     distFt,
     speedKt,
-    groundSpeedKt: speedKt - (api.game.level.headwindKt ?? 0),
+    groundSpeedKt: speedKt - (api.game.level.weather.headwindKt ?? 0),
     pitchDeg,
     pitchCmd: pitchDeg,
     thrust: aircraft.thrustAtApproach,

@@ -63,6 +63,24 @@ Touching down at 700 fpm is a gear collapse even if you are perfectly aligned.
 Levels 2 and 3 start with the flaps up, levels 4 to 7 start clean (gear and
 flaps up). Configuring the aircraft is part of the job.
 
+## Weather, the difficulty axis
+
+Weather is independent of the aircraft: four profiles, each one a different
+fight. A level carries a default profile, and the profile can be swapped without
+touching the aircraft.
+
+| Profile | Crosswind | Gusts | Visibility | Runway |
+| --- | --- | --- | --- | --- |
+| Calm | 0 kt | none | 10 nm | dry |
+| Windy | 12 kt | 5 kt | 10 nm | dry |
+| Storm | 18 kt | 8 kt | 3 nm | wet (62% braking) |
+| Snow | 8 kt | 4 kt | 2 nm | contaminated (35% braking) |
+
+Gusts are deterministic and fade to nothing at the surface, so a bad touchdown
+is never a gust's fault. A profile whose crosswind is beyond the aircraft's
+demonstrated limit is flagged in the briefing — the C152 in a storm is a bad
+idea in real life, and the game says so instead of pretending otherwise.
+
 ## How a landing is graded
 
 A landing fails when:
@@ -106,9 +124,9 @@ around 950 ft of geometry plus the flare, and not on the threshold itself.
 npm test        # node --test test/
 ```
 
-81 tests in six groups: the physics and grading, the projection math, a render
+95 tests in seven groups: the physics and grading, the projection math, a render
 smoke test that draws every view on every level and phase through a stub canvas
-context, the camera view toggle, the lateral model and alignment grading, and an end-to-end playthrough that flies all
+context, the camera view toggle, the lateral model and alignment grading, the weather profiles, and an end-to-end playthrough that flies all
 seven levels through the real keyboard input path and requires each to score a
 medal.
 
@@ -117,7 +135,8 @@ medal.
 ```
 index.html            canvas + CSS, nothing else
 src/aircraft.js       the seven-aircraft ladder, with real envelopes
-src/levels.js         one level per aircraft: runway, wind, setup, briefing
+src/levels.js         one level per aircraft: runway, setup, weather, briefing
+src/weather.js        the four weather profiles, braking, gusts, visibility
 src/physics.js        flight model, glide path, touchdown grading
 src/game.js           game states, input, scoring, best results (DOM-free)
 src/main.js           canvas, keyboard and requestAnimationFrame wiring

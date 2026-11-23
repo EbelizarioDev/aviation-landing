@@ -9,7 +9,7 @@ import { deviationBand, pathDeviationFt } from './projection.js';
 const TOP = VIEW.windshieldBottom + 12;
 const HEIGHT = VIEW.height - TOP - 46;
 
-export function drawPanel(ctx, { state, aircraft, level, cues }) {
+export function drawPanel(ctx, { state, aircraft, level, weather, cues }) {
   ctx.fillStyle = COLORS.panel;
   ctx.fillRect(0, VIEW.windshieldBottom, VIEW.width, VIEW.height - VIEW.windshieldBottom);
   ctx.strokeStyle = COLORS.panelEdge;
@@ -32,7 +32,7 @@ export function drawPanel(ctx, { state, aircraft, level, cues }) {
   drawVsi(ctx, 668, TOP, 92, HEIGHT, state);
   drawGlidePath(ctx, 392, TOP, 158, HEIGHT, state);
   drawSystems(ctx, 782, TOP, 156, HEIGHT, { state, aircraft, cues });
-  drawAnnunciators(ctx, { state, aircraft, cues });
+  drawAnnunciators(ctx, { state, aircraft, cues, weather });
 }
 
 function frame(ctx, x, y, w, h) {
@@ -315,7 +315,7 @@ function drawSystems(ctx, x, y, w, h, { state, aircraft, cues }) {
   }
 }
 
-function drawAnnunciators(ctx, { state, aircraft, cues }) {
+function drawAnnunciators(ctx, { state, aircraft, cues, weather }) {
   const y = VIEW.height - 34;
   const items = [];
   items.push({ text: aircraft.name.toUpperCase(), color: COLORS.text });
@@ -324,6 +324,20 @@ function drawAnnunciators(ctx, { state, aircraft, cues }) {
   if (cues?.flare) items.push({ text: 'FLARE', color: COLORS.amber });
   if (state.onGround) items.push({ text: 'ON GROUND', color: COLORS.text });
   if (state.damage?.length) items.push({ text: `DAMAGE: ${state.damage.join(', ')}`, color: COLORS.red });
+  if (weather) {
+    const xw = Math.round(Math.abs(weather.crosswindKt));
+    const beyond = xw > (aircraft.maxCrosswindKt ?? Infinity);
+    items.push({
+      text: `WIND ${xw} KT ${weather.crosswindKt >= 0 ? '→' : '←'}`,
+      color: beyond ? COLORS.red : COLORS.text,
+    });
+    if (weather.gustAmpKt) {
+      items.push({ text: `GUST ${Math.round(weather.gustAmpKt)} KT`, color: COLORS.amber });
+    }
+    if ((weather.runway ?? 'dry') !== 'dry') {
+      items.push({ text: weather.runway.toUpperCase(), color: COLORS.amber });
+    }
+  }
   items.push({
     text: `DIST ${Math.max(0, (state.distFt / 6076.12)).toFixed(1)} NM`,
     color: COLORS.text,

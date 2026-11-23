@@ -8,7 +8,8 @@ import { VIEW } from '../src/render/layout.js';
 import { drawCockpit } from '../src/render/cockpit.js';
 import { drawPanel } from '../src/render/panel.js';
 import { drawMinimap } from '../src/render/minimap.js';
-import { stubContext } from './helpers/canvas-stub.js';
+import { labels, stubContext } from './helpers/canvas-stub.js';
+import { WEATHER } from '../src/weather.js';
 import {
   makeCamera,
   pathDeviationFt,
@@ -172,4 +173,47 @@ test('the panel shows gear up when the aircraft is not configured', () => {
   drawPanel(ctx, { state, aircraft, level, cues: {} });
   const labels = ctx.ops.filter((o) => o[0] === 'fillText').map((o) => o[1]);
   assert.ok(labels.includes('UP'), 'gear reads UP');
+});
+
+test('every weather profile can be drawn in both views in every phase', () => {
+  for (const level of LEVELS) {
+    const aircraft = getAircraft(level.aircraft);
+    for (const { name, state } of sampleStates(aircraft, level)) {
+      for (const weather of WEATHER) {
+        const ctx = stubContext();
+        const view = { state, aircraft, level, weather, t: 12.5 };
+        assert.doesNotThrow(() => drawCockpit(ctx, view), `${level.aircraft} ${weather.id} cockpit`);
+        assert.doesNotThrow(() => drawMinimap(ctx, view), `${level.aircraft} ${weather.id} minimap`);
+        assert.doesNotThrow(
+          () => drawPanel(ctx, { ...view, cues: { stall: false, flare: name === 'flare' } }),
+          `${level.aircraft} ${weather.id} panel`,
+        );
+        assert.ok(ctx.ops.length > 60, `${level.aircraft} ${weather.id} drew something`);
+      }
+    }
+  }
+});
+
+test('the panel announces the wind, the gusts and the surface', () => {
+  const aircraft = getAircraft('b738');
+  const level = LEVELS[5];
+  const state = createState(aircraft, level, WEATHER[2]);
+  const ctx = stubContext();
+  drawPanel(ctx, { state, aircraft, level, weather: WEATHER[2], cues: {} });
+  const shown = labels(ctx);
+  assert.ok(shown.some((l) => l.startsWith('WIND')), shown.join(' | '));
+  assert.ok(shown.some((l) => l.startsWith('GUST')));
+  assert.ok(shown.includes('WET'));
+});
+
+test('a contaminated runway is drawn differently from a dry one', () => {
+  const aircraft = getAircraft('c152');
+  const level = LEVELS[0];
+  const state = createState(aircraft, level);
+  const dry = stubContext();
+  drawCockpit(dry, { state, aircraft, level, weather: WEATHER[0], t: 0 });
+  const snow = stubContext();
+  drawCockpit(snow, { state, aircraft, level, weather: WEATHER[3], t: 0 });
+  const fills = (ctx) => ctx.ops.filter((op) => op[0] === 'fill').map((op) => op[1]);
+  assert.notDeepEqual(fills(dry), fills(snow), 'the surface colour changes');
 });

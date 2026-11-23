@@ -126,7 +126,7 @@ export function stepThrust(actual, cmd, spoolS, dt) {
 // State
 // ---------------------------------------------------------------------------
 
-export function createState(aircraft, level) {
+export function createState(aircraft, level, weather = level.weather) {
   // "landing" starts already configured; "flaps-up" and "clean" make the player
   // do the approach configuration, which is the level's lesson.
   const setup = level.setup ?? 'landing';
@@ -134,7 +134,7 @@ export function createState(aircraft, level) {
   const gearDown = setup === 'landing' || aircraft.gear !== 'retractable';
   const speedKt = aircraft.vrefKt + (setup === 'landing' ? 8 : 5);
   const pitchDeg = setup === 'landing' ? 5 : 3;
-  const groundSpeedKt = speedKt - (level.headwindKt ?? 0);
+  const groundSpeedKt = speedKt - (weather?.headwindKt ?? 0);
   return {
     altFt: glidePathAltFt(level.distNm),
     distFt: level.distNm * FEET_PER_NM,
@@ -287,10 +287,11 @@ function stepGround(aircraft, s, controls, dt) {
   if (s.stopped) return next;
 
   const brake = clamp(controls.brake ?? 0, 0, 1) * aircraft.brakeKtS;
-  const wetFactor = controls.wet ? 0.62 : 1;
+  // Dry, wet or contaminated: the surface decides how much of the brake arrives.
+  const braking = controls.brakingFactor ?? (controls.wet ? 0.62 : 1);
   const reverse = controls.reverse && aircraft.reverse ? 3.4 : 0;
   const spoilers = controls.spoilers && aircraft.spoilers ? 2.0 : 0;
-  const decel = 1.0 + brake * wetFactor + reverse + spoilers;
+  const decel = 1.0 + brake * braking + reverse + spoilers;
 
   next.speedKt = Math.max(0, s.speedKt - decel * dt);
   next.vsiFpm = 0;

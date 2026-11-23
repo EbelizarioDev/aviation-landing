@@ -26,7 +26,10 @@ export function autopilotInputs(state, aircraft, level, options = {}) {
 
   // --- lateral. The flight path (chi) is held by banking; the rudder only puts
   // the nose off the path, which is the de-crab.
-  const crosswindKt = level.crosswindKt ?? 0;
+  // The active profile is what the aircraft is flying through, and it is not
+  // always the level's default one.
+  const weather = options.weather ?? level.weather ?? level;
+  const crosswindKt = weather.crosswindKt ?? 0;
   // The crab cancels the wind against the speed *through the air*, not over the
   // ground: that is what the drift equation in the physics uses.
   const crabDeg = -Math.asin(clamp(crosswindKt / Math.max(1, state.speedKt), -0.6, 0.6)) / DEG;

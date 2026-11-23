@@ -4,6 +4,7 @@
 import { getAircraft } from './aircraft.js';
 import { LEVELS } from './levels.js';
 import * as P from './physics.js';
+import { brakingFactor, getWeather, gustAt } from './weather.js';
 
 const BEST_KEY = 'aviation-landing.bests';
 const FLAP_DOWN = 'KeyF';
@@ -16,11 +17,13 @@ export function createGame({ storage = null } = {}) {
     levelIndex: 0,
     aircraft: null,
     level: null,
+    weather: null,
     state: null,
     result: null,
     throttle: 0.45,
     paused: false,
     view: 'cockpit',
+    weatherId: null,
     t: 0,
     bests: loadBests(storage),
   };
@@ -30,6 +33,7 @@ export function createGame({ storage = null } = {}) {
     game.levelIndex = clamped;
     game.level = LEVELS[clamped];
     game.aircraft = getAircraft(game.level.aircraft);
+    game.weather = game.weatherId ? getWeather(game.weatherId) : game.level.weather;
     game.state = null;
     game.result = null;
     game.paused = false;
@@ -40,7 +44,7 @@ export function createGame({ storage = null } = {}) {
 
   function begin() {
     if (!game.aircraft) return;
-    game.state = P.createState(game.aircraft, game.level);
+    game.state = P.createState(game.aircraft, game.level, game.weather);
     game.throttle = game.aircraft.thrustAtApproach;
     game.t = 0;
     game.result = null;
@@ -112,7 +116,7 @@ export function createGame({ storage = null } = {}) {
 
   function readControls(dt) {
     const state = game.state;
-    const level = game.level;
+    const weather = game.weather;
     // W/S pitch, A/D aileron, Q/E rudder, arrows throttle. Pitch is never
     // removed from an aircraft: without it there is no path and no flare.
     const noseUp = keys.has('KeyW');
@@ -125,8 +129,7 @@ export function createGame({ storage = null } = {}) {
     const throttleInput = (keys.has('ArrowUp') ? 1 : 0) - (keys.has('ArrowDown') ? 1 : 0);
     game.throttle = P.clamp(game.throttle + throttleInput * 0.5 * dt, 0, 1);
 
-    const gustFpm =
-      level.gustFpm * (Math.sin(game.t * 1.3) * 0.6 + Math.sin(game.t * 2.9 + 1) * 0.4);
+    const gustFpm = gustAt(weather, game.t, state.altFt);
 
     return {
       pitch: (noseUp ? 1 : 0) + (noseDown ? -1 : 0),
@@ -136,10 +139,11 @@ export function createGame({ storage = null } = {}) {
       brake: keys.has('Space') ? 1 : 0,
       reverse: keys.has('KeyB'),
       spoilers: state.spoilers,
-      crosswindKt: level.crosswindKt,
-      headwindKt: level.headwindKt,
+      crosswindKt: weather.crosswindKt,
+      headwindKt: weather.headwindKt,
       gustFpm,
-      wet: level.wet,
+      brakingFactor: brakingFactor(weather.runway),
+      wet: weather.runway !== 'dry',
     };
   }
 

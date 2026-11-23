@@ -53,10 +53,10 @@ interface copy and must match the panel labels a player reads.
 
 | ID | Spec | Work |
 |----|------|------|
-| T1 | S5 | Move the autopilot to `src/autopilot.js` with a smooth throttle target, tests re-export it |
-| T2 | S1,S3,S4 | Demo mode in the game orchestrator: instructor controls, no medals, back to briefing |
-| T3 | S2 | Ordered narration cues and instrument highlighting |
-| T4 | S5,S6 | Tests: the demo lands, the captions fire in order, keys are inert, speed stays near reference |
+| T1 | S5 | Move the autopilot to `src/autopilot.js` with a smooth throttle target, tests re-export it | done `b3dc311` |
+| T2 | S1,S3,S4 | Demo mode in the game orchestrator: instructor controls, no medals, back to briefing | done `b3dc311` |
+| T3 | S2 | Ordered narration cues and instrument highlighting | done `b3dc311` |
+| T4 | S5,S6 | Tests: the demo lands, the captions fire in order, keys are inert, speed stays near reference | done `b3dc311` |
 
 ## Log
 
@@ -65,3 +65,11 @@ L1 — "Acabo de leer que usaste un autopilot para el test. Deberíamos de agreg
 L2 — "Podríamos fingir que el instructor tiene los controles del avión, así estamos viendo como el desciende y aterriza mientras nos narra sus pasos."
 
 L3 — Scope decision from L2: the demo is the instructor flying and narrating, not a pause-and-prompt tutorial and not instrument tooltips. Recorded as S1-S6. Guided practice and `?` callouts stay unbuilt for now.
+
+L4 — Built in one work unit, test-first for the narration. 119 tests green. Two design decisions worth keeping:
+
+L5 — The demonstration pilot is the *test* pilot, moved to `src/autopilot.js`, and the test helper is now a re-export. One implementation means the instructor and the 28-cell landability test can never drift apart.
+
+L6 — The bang-bang throttle that verifies fine looks like a pilot fighting the aircraft. The pilot gained a smooth `throttleTarget`; the demo uses that, the keyboard pilot keeps the coarse up/down booleans. Both paths are tested.
+
+L7 — Narration beats carry a `byT` fallback so a beat whose condition becomes unreachable can never block the ones behind it. Tested directly with a state that is already on the ground at t=200.

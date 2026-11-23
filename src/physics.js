@@ -32,7 +32,9 @@ const SPOILER_DRAG = 1.25;
 const STALL_DRAG = 2.5;
 const HARD_TOUCHDOWN_FPM = 300;
 const SPEED_TOLERANCE_KT = 10;
-const HALF_RUNWAY_WIDTH_FT = 49;
+// 45 m, the width of a real runway: the same number draws the runway on the
+// windshield, positions the localizer diamond and decides "off the edge".
+export const RUNWAY_HALF_WIDTH_FT = 74;
 
 export function clamp(v, lo, hi) {
   return v < lo ? lo : v > hi ? hi : v;
@@ -119,22 +121,28 @@ export function stepThrust(actual, cmd, spoolS, dt) {
 // ---------------------------------------------------------------------------
 
 export function createState(aircraft, level) {
-  const flapIdx = aircraft.flaps.length - 1;
-  const speedKt = aircraft.vrefKt + 8;
+  // "landing" starts already configured; "flaps-up" and "clean" make the player
+  // do the approach configuration, which is the level's lesson.
+  const setup = level.setup ?? 'landing';
+  const flapIdx = setup === 'landing' ? aircraft.flaps.length - 1 : 0;
+  const gearDown = setup === 'landing' || aircraft.gear !== 'retractable';
+  const speedKt = aircraft.vrefKt + (setup === 'landing' ? 8 : 5);
+  const pitchDeg = setup === 'landing' ? 5 : 3;
+  const groundSpeedKt = speedKt - (level.headwindKt ?? 0);
   return {
     altFt: glidePathAltFt(level.distNm),
     distFt: level.distNm * FEET_PER_NM,
     speedKt,
-    pitchCmd: 5,
-    pitchDeg: 5,
+    pitchCmd: pitchDeg,
+    pitchDeg,
     alphaDeg: alphaDeg(aircraft, speedKt),
-    gammaDeg: 5 - alphaDeg(aircraft, speedKt),
+    gammaDeg: pitchDeg - alphaDeg(aircraft, speedKt),
     vsiFpm: 0,
-    groundSpeedKt: speedKt - level.headwindKt,
+    groundSpeedKt,
     thrust: aircraft.thrustAtApproach,
     thrustCmd: aircraft.thrustAtApproach,
     flapIdx,
-    gearDown: true,
+    gearDown,
     spoilers: false,
     lateralFt: 18,
     steerDeg: 0,
@@ -349,7 +357,7 @@ export function classifyTouchdown(aircraft, level, td) {
   if (td.pastThresholdFt > tdzFt) {
     return { ...base, ok: false, code: 'long', label: 'Overrun: you wasted the touchdown zone' };
   }
-  if (Math.abs(td.lateralFt) > HALF_RUNWAY_WIDTH_FT) {
+  if (Math.abs(td.lateralFt) > RUNWAY_HALF_WIDTH_FT) {
     return { ...base, ok: false, code: 'edge', label: 'Off the runway edge' };
   }
   if (Math.abs(speedDev) > SPEED_TOLERANCE_KT) {
@@ -364,7 +372,7 @@ export function classifyTouchdown(aircraft, level, td) {
   const fpmPenalty = Math.max(0, (td.fpm - 150) / (HARD_TOUCHDOWN_FPM - 150)) * 30;
   const speedPenalty = Math.max(0, (Math.abs(speedDev) - 3) / (SPEED_TOLERANCE_KT - 3)) * 25;
   const latPenalty =
-    Math.max(0, (Math.abs(td.lateralFt) - 10) / (HALF_RUNWAY_WIDTH_FT - 10)) * 20;
+    Math.max(0, (Math.abs(td.lateralFt) - 10) / (RUNWAY_HALF_WIDTH_FT - 10)) * 20;
   const zoneError = Math.abs(td.pastThresholdFt - idealFt);
   const zonePenalty = Math.max(0, (zoneError - 500) / Math.max(1, tdzFt - 500)) * 25;
   const points = Math.round(

@@ -38,12 +38,16 @@ stall) is unit tested with `node --test`.
 
 | ID | Spec | Work | Route | Commit |
 |----|------|------|-------|--------|
-| T1 | S3,S4,S6,S8 | Aircraft data for the seven-model ladder + physics core + unit tests | inline | |
-| T2 | S2,S5 | Cockpit windshield renderer: projected runway, approach lights, PAPI, horizon | inline | |
-| T3 | S2,S5 | Instrument panel: attitude, speed/altitude tapes, VSI, glideslope/localizer | inline | |
-| T4 | S2,S5 | Side-profile minimap with the 3° glidepath and deviation colouring | inline | |
-| T5 | S1,S7 | Game loop, input, level orchestration, touchdown scoring, screens | inline | |
-| T6 | S5 | README with controls + final verification run | inline | |
+| T1 | S3,S4,S6,S8 | Aircraft data for the seven-model ladder + physics core + unit tests | inline | `f2ef552` |
+| T2 | S2,S5 | Cockpit windshield renderer: projected runway, approach lights, PAPI, horizon | inline | `d57f4fc` |
+| T3 | S2,S5 | Instrument panel: attitude, speed/altitude tapes, VSI, glideslope/localizer | inline | `d57f4fc` |
+| T4 | S2,S5 | Side-profile minimap with the 3° glidepath and deviation colouring | inline | `d57f4fc` |
+| T5 | S1,S7 | Game loop, input, level orchestration, touchdown scoring, screens | inline | `e5ca8b9` |
+| T6 | S5 | README with controls + final verification run | inline | `52819a9` |
+
+All six tasks done. 54 tests green (`npm test`): physics and grading, projection
+math, a render smoke test over every level and phase, and a keyboard-driven
+playthrough of all seven levels that requires a medal on each.
 
 ## Log
 
@@ -58,3 +62,12 @@ L4 — Design accepted ("Me parece bien") on the proposal: cockpit windshield + 
 L5 — Decision: implement inline in one session, no subagents. Reason: the requirement is a single coherent visual language across three renderers; parallel writers would fragment legibility, which is the top stated requirement.
 
 L6 — Decision: repo-local git identity (`sistemas <sistemas@localhost>`) because the environment has no global git user configured.
+
+L7 — Implementation decisions recorded while building:
+- The 3° path crosses the threshold at 50 ft (real ILS geometry), so a stabilised approach touches down ~950 ft past the threshold plus the flare. This replaced an earlier model that put the path at zero at the threshold and made every level grade as an overrun.
+- Touchdown zone is 60% of the runway capped at 3000 ft, because the flare pushes the real touchdown to 1400-2100 ft.
+- Stall now drops the nose: without it a stalled aircraft mushed down at 4° and was not a real consequence.
+- Runway width is 45 m everywhere, and the same constant draws the runway, positions the localizer diamond and decides the off-edge failure.
+- Closed-loop autopilots found two real bugs: `createState` did not seed `groundSpeedKt` (NaN lateral drift) and `finish()` crashed when the approach flew past the runway without a touchdown record.
+- Approach lengths trimmed to 2.0-4.5 nm after the playthrough measured 3-4 minutes per attempt, too long for the stated "pass the time" purpose. Now ~2 minutes.
+- Levels 2-7 start unconfigured (flaps up, gear up on retractable) so configuring is part of the work.

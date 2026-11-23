@@ -146,10 +146,12 @@ test('a jet spools far slower than a piston', () => {
 test('retractable gear only moves on retractable aircraft', () => {
   const jet = getAircraft('b738');
   const level = levelByNumber(6);
-  const state = createState(jet, level);
-  assert.equal(setGearDown(jet, state, false).gearDown, false);
-  // Gear up removes drag, so the aircraft accelerates more for the same path.
-  assert.ok(speedAccelKtS(jet, { ...state, gearDown: false }, -3) > speedAccelKtS(jet, state, -3));
+  const clean = createState(jet, level);
+  assert.equal(clean.gearDown, false);
+  const dirty = setGearDown(jet, clean, true);
+  assert.equal(dirty.gearDown, true);
+  // Gear down adds drag, so the aircraft accelerates less for the same path.
+  assert.ok(speedAccelKtS(jet, dirty, -3) < speedAccelKtS(jet, clean, -3));
 
   const trainer = getAircraft('c152');
   const trainerState = createState(trainer, levelByNumber(1));
@@ -158,7 +160,7 @@ test('retractable gear only moves on retractable aircraft', () => {
 
 test('flaps move one detent and stop at the ends', () => {
   const a = getAircraft('c172');
-  let s = createState(a, levelByNumber(2));
+  let s = createState(a, levelByNumber(1));
   const full = FLAPS_FULL(a);
   assert.equal(s.flapIdx, full);
   s = setFlapSetting(a, s, -1);
@@ -252,6 +254,9 @@ test('precision changes the medal, not just the pass', () => {
 function flyLevel(aircraft, level) {
   const dt = 1 / 60;
   let s = createState(aircraft, level);
+  // The pilot runs the approach checklist before joining the path.
+  for (let i = 0; i < aircraft.flaps.length; i++) s = setFlapSetting(aircraft, s, +1);
+  s = setGearDown(aircraft, s, true);
   let t = 0;
   const flareFt = 50;
   const touchdownSink = 150;
@@ -305,6 +310,21 @@ function flyLevel(aircraft, level) {
   }
   return s;
 }
+
+test('the first level starts configured, later levels make you configure', () => {
+  const trainer = createState(getAircraft('c152'), levelByNumber(1));
+  assert.equal(trainer.flapIdx, getAircraft('c152').flaps.length - 1);
+  assert.equal(trainer.gearDown, true);
+
+  const caravan = getAircraft('c208');
+  const caravanState = createState(caravan, levelByNumber(3));
+  assert.equal(caravanState.flapIdx, 0);
+
+  const jet = getAircraft('b738');
+  const jetState = createState(jet, levelByNumber(6));
+  assert.equal(jetState.flapIdx, 0);
+  assert.equal(jetState.gearDown, false);
+});
 
 test('the closed-loop model lands the Cessna 152 in limits', () => {
   const a = getAircraft('c152');

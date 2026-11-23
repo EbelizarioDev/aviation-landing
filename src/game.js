@@ -5,6 +5,8 @@ import { getAircraft } from './aircraft.js';
 import { LEVELS } from './levels.js';
 import * as P from './physics.js';
 import { WEATHER, brakingFactor, getWeather, gustAt } from './weather.js';
+import { autopilotInputs } from './autopilot.js';
+import { cueAt, dueCueCount } from './instructor.js';
 
 const BEST_KEY = 'aviation-landing.bests';
 
@@ -49,6 +51,10 @@ export function createGame({ storage = null } = {}) {
     view: 'cockpit',
     weatherId: null,
     notice: null,
+    demo: false,
+    cue: 0,
+    cueAt: 0,
+    demoRuns: 0,
     t: 0,
     bests: loadBests(storage),
   };
@@ -67,6 +73,25 @@ export function createGame({ storage = null } = {}) {
     game.phase = 'briefing';
   }
 
+  /** The instructor flies it while narrating. Awards nothing. */
+  function startDemo() {
+    begin();
+    game.demo = true;
+    game.cue = 1;
+    game.cueAt = 0;
+  }
+
+  function endDemo() {
+    game.demo = false;
+    game.cue = 0;
+    game.cueAt = 0;
+    game.state = null;
+    game.result = null;
+    game.demoRuns += 1;
+    game.phase = 'briefing';
+    game.throttle = game.aircraft.thrustAtApproach;
+  }
+
   function begin() {
     if (!game.aircraft) return;
     game.state = P.createState(game.aircraft, game.level, game.weather);
@@ -74,6 +99,9 @@ export function createGame({ storage = null } = {}) {
     game.t = 0;
     game.result = null;
     game.paused = false;
+    game.demo = false;
+    game.cue = 0;
+    game.cueAt = 0;
     game.phase = 'flying';
   }
 
@@ -107,13 +135,17 @@ export function createGame({ storage = null } = {}) {
         break;
       case 'briefing':
         if (code === 'Enter') begin();
+        else if (code === 'KeyD') startDemo();
         else if (code === 'Escape') toMenu();
         break;
       case 'flying':
       case 'rollout':
         if (code === 'KeyP') game.paused = !game.paused;
-        else if (code === 'KeyR') startLevel(game.levelIndex);
         else if (code === 'Escape') toMenu();
+        else if (game.demo) {
+          // The instructor has the controls: only the view and pause answer.
+          if (code === 'KeyC') game.view = game.view === 'cockpit' ? 'chase' : 'cockpit';
+        } else if (code === 'KeyR') startLevel(game.levelIndex);
         else if (code === 'KeyC') {
           // Where you look from, not what you can read: allowed even when paused.
           game.view = game.view === 'cockpit' ? 'chase' : 'cockpit';
@@ -193,6 +225,41 @@ export function createGame({ storage = null } = {}) {
     };
   }
 
+  function instructorControls() {
+    const inputs = autopilotInputs(game.state, game.aircraft, game.level, {
+      weather: game.weather,
+    });
+    game.throttle = inputs.throttleTarget;
+    const onGround = game.state.onGround;
+    return {
+      pitch: inputs.pitch,
+      aileron: inputs.aileron,
+      rudder: inputs.rudder,
+      throttle: onGround ? 0 : inputs.throttleTarget,
+      brake: onGround ? 1 : 0,
+      reverse: onGround,
+      spoilers: onGround,
+      crosswindKt: game.weather.crosswindKt,
+      headwindKt: game.weather.headwindKt,
+      gustFpm: gustAt(game.weather, game.t, game.state.altFt),
+      brakingFactor: brakingFactor(game.weather.runway),
+    };
+  }
+
+  function advanceNarration() {
+    if (!game.demo) return;
+    const due = dueCueCount(game.state, {
+      t: game.t,
+      aircraft: game.aircraft,
+      weather: game.weather,
+    });
+    // One beat at a time, each held long enough to read.
+    if (due > game.cue && game.t - game.cueAt >= 3) {
+      game.cue += 1;
+      game.cueAt = game.t;
+    }
+  }
+
   function update(dt) {
     if (game.paused) return;
     if (game.phase !== 'flying' && game.phase !== 'rollout') return;
@@ -201,8 +268,10 @@ export function createGame({ storage = null } = {}) {
     const aircraft = game.aircraft;
     const level = game.level;
     const prev = game.state;
-    const next = P.step(aircraft, prev, readControls(dt), dt);
+    const controls = game.demo ? instructorControls() : readControls(dt);
+    const next = P.step(aircraft, prev, controls, dt);
     game.state = next;
+    advanceNarration();
 
     if (!prev.onGround && next.onGround) game.phase = 'rollout';
 
@@ -211,12 +280,17 @@ export function createGame({ storage = null } = {}) {
     if (next.onGround) {
       const endFt = next.touchdown.pastThresholdFt + next.rollFt;
       if (endFt > runwayFt) {
-        finish(next, { excursion: true });
+        if (game.demo) endDemo();
+        else finish(next, { excursion: true });
         return;
       }
-      if (next.stopped) finish(next, {});
+      if (next.stopped) {
+        if (game.demo) endDemo();
+        else finish(next, {});
+      }
     } else if (next.distFt < -runwayFt) {
-      finish(next, { missed: true });
+      if (game.demo) endDemo();
+      else finish(next, { missed: true });
     }
   }
 
@@ -271,6 +345,11 @@ export function createGame({ storage = null } = {}) {
     }
   }
 
+  /** The narration beat on screen right now, if any. */
+  function currentCue() {
+    return game.demo ? cueAt(game.cue) : null;
+  }
+
   function bestFor(levelNumber, weatherId) {
     return game.bests[cellKeyFor(levelNumber, weatherId)];
   }
@@ -278,6 +357,9 @@ export function createGame({ storage = null } = {}) {
   return {
     game,
     bestFor,
+    currentCue,
+    startDemo,
+    endDemo,
     notify,
     press,
     release,

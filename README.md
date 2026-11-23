@@ -35,7 +35,10 @@ Opening `index.html` straight from the filesystem will not work.
 | `Esc` | Back to the menu |
 
 In the menu: `↑`/`↓` choose the aircraft, `←`/`→` choose the weather, `ENTER`
-flies. Each aircraft only exposes the systems it actually has: press `G` on the
+flies. In the briefing, **`D` hands the controls to the instructor**, who flies
+the whole approach and landing while narrating each step and highlighting the
+instrument he is talking about. It awards nothing and gives you back a fresh
+approach, so you can watch first and fly second. Each aircraft only exposes the systems it actually has: press `G` on the
 C152 and it answers *"GEAR: FIXED ON THIS AIRCRAFT"* instead of doing nothing.
 Pitch and throttle are on every aircraft, because without them nothing flies.
 
@@ -131,9 +134,9 @@ around 950 ft of geometry plus the flare, and not on the threshold itself.
 npm test        # node --test test/
 ```
 
-110 tests in eight groups: the physics and grading, the projection math, a render
+119 tests in nine groups: the physics and grading, the projection math, a render
 smoke test that draws every view on every level and phase through a stub canvas
-context, the camera view toggle, the lateral model and alignment grading, the weather profiles, the 28-cell matrix, the control map per aircraft, and an
+context, the camera view toggle, the lateral model and alignment grading, the weather profiles, the 28-cell matrix, the control map per aircraft, the instructor demo, and an
 end-to-end playthrough that flies all
 seven levels through the real keyboard input path and requires each to score a
 medal.
@@ -145,6 +148,8 @@ index.html            canvas + CSS, nothing else
 src/aircraft.js       the seven-aircraft ladder, with real envelopes
 src/levels.js         one level per aircraft: runway, setup, weather, briefing
 src/weather.js        the four weather profiles, braking, gusts, visibility
+src/autopilot.js      the demonstration pilot (and the one the tests fly)
+src/instructor.js     the narration beats and their triggers
 src/physics.js        flight model, glide path, touchdown grading
 src/game.js           game states, input, control map, scoring, per-cell bests
 src/main.js           canvas, keyboard and requestAnimationFrame wiring

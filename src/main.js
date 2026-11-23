@@ -8,7 +8,7 @@ import { cellKeyFor, controlsFor, createGame, selectedWeatherId } from './game.j
 import { VIEW, COLORS } from './render/layout.js';
 import { drawCockpit } from './render/cockpit.js';
 import { drawChase } from './render/chase.js';
-import { drawPanel } from './render/panel.js';
+import { PANEL_REGIONS, drawPanel } from './render/panel.js';
 import { drawMinimap } from './render/minimap.js';
 
 const DT = 1 / 60;
@@ -30,6 +30,7 @@ const HANDLED = new Set([
   'KeyX',
   'KeyB',
   'KeyC',
+  'KeyD',
   'KeyN',
   'KeyP',
   'KeyR',
@@ -87,7 +88,8 @@ function render() {
     }
     drawMinimap(ctx, { state: game.state, aircraft: game.aircraft, level: game.level, weather: game.weather });
     drawPanel(ctx, { state: game.state, aircraft: game.aircraft, level: game.level, weather: game.weather, cues });
-    if (game.phase === 'rollout') drawRolloutHint();
+    if (game.phase === 'rollout' && !game.demo) drawRolloutHint();
+    drawDemoOverlay();
     drawNotice();
   } else {
     ctx.fillStyle = '#07090b';
@@ -257,7 +259,61 @@ function drawBriefing() {
     text(control.action, x + 90, cy, { size: 12, color: COLORS.text });
   });
 
-  text('ENTER fly    ESC back', x, VIEW.height - 40, { size: 14, color: COLORS.dim });
+  text(
+    game.demoRuns > 0
+      ? 'ENTER fly    D watch the instructor again    ESC back'
+      : 'ENTER fly    D watch the instructor first    ESC back',
+    x,
+    VIEW.height - 40,
+    { size: 14, color: COLORS.dim },
+  );
+}
+
+/**
+ * The instructor's beat: a highlighted instrument and a caption. Reuses the
+ * panel's own geometry so the frame lands exactly on the box being explained.
+ */
+function drawDemoOverlay() {
+  if (!game.demo || !game.state) return;
+  const cue = api.currentCue();
+
+  ctx.fillStyle = 'rgba(8,12,16,0.78)';
+  ctx.fillRect(12, 12, 168, 26);
+  ctx.strokeStyle = COLORS.amber;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(12.5, 12.5, 167, 25);
+  text('DEMO · INSTRUCTOR FLYING', 20, 30, { size: 11, color: COLORS.amber });
+
+  if (cue?.focus && PANEL_REGIONS[cue.focus]) {
+    const r = PANEL_REGIONS[cue.focus];
+    ctx.strokeStyle = COLORS.amber;
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(r.x - 3, r.y - 3, r.w + 6, r.h + 6);
+    ctx.fillStyle = COLORS.amber;
+    ctx.beginPath();
+    ctx.moveTo(r.x + r.w / 2 - 7, r.y - 8);
+    ctx.lineTo(r.x + r.w / 2 + 7, r.y - 8);
+    ctx.lineTo(r.x + r.w / 2, r.y - 1);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  if (!cue) return;
+  const boxX = 110;
+  const boxW = VIEW.width - 220;
+  const boxY = VIEW.windshieldBottom - 104;
+  ctx.fillStyle = 'rgba(8,12,16,0.86)';
+  ctx.fillRect(boxX, boxY, boxW, 74);
+  ctx.strokeStyle = COLORS.amber;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(boxX + 1, boxY + 1, boxW - 2, 72);
+  ctx.fillStyle = COLORS.amber;
+  ctx.fillRect(boxX, boxY, 5, 74);
+  text('INSTRUCTOR', boxX + 16, boxY + 20, { size: 10, color: COLORS.amber });
+  wrap(cue.text({ aircraft: game.aircraft, weather: game.weather }), boxX + 16, boxY + 40, boxW - 32, 18, {
+    size: 14,
+    color: COLORS.text,
+  });
 }
 
 function drawNotice() {

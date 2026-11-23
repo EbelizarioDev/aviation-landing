@@ -9,6 +9,16 @@ import { deviationBand, pathDeviationFt } from './projection.js';
 const TOP = VIEW.windshieldBottom + 12;
 const HEIGHT = VIEW.height - TOP - 46;
 
+/** Instrument geometry, so a highlight can point at a box by name. */
+export const PANEL_REGIONS = {
+  attitude: { x: 62, y: TOP, w: 214, h: HEIGHT },
+  speed: { x: 302, y: TOP, w: 74, h: HEIGHT },
+  path: { x: 392, y: TOP, w: 158, h: HEIGHT },
+  altitude: { x: 566, y: TOP, w: 86, h: HEIGHT },
+  vsi: { x: 668, y: TOP, w: 92, h: HEIGHT },
+  systems: { x: 782, y: TOP, w: 156, h: HEIGHT },
+};
+
 export function drawPanel(ctx, { state, aircraft, level, weather, cues }) {
   ctx.fillStyle = COLORS.panel;
   ctx.fillRect(0, VIEW.windshieldBottom, VIEW.width, VIEW.height - VIEW.windshieldBottom);
@@ -19,8 +29,9 @@ export function drawPanel(ctx, { state, aircraft, level, weather, cues }) {
   ctx.lineTo(VIEW.width, VIEW.windshieldBottom + 1);
   ctx.stroke();
 
-  drawAttitude(ctx, 62, TOP, 214, HEIGHT, state);
-  drawTape(ctx, 302, TOP, 74, HEIGHT, {
+  const R = PANEL_REGIONS;
+  drawAttitude(ctx, R.attitude.x, R.attitude.y, R.attitude.w, R.attitude.h, state);
+  drawTape(ctx, R.speed.x, R.speed.y, R.speed.w, R.speed.h, {
     value: state.speedKt,
     label: 'KT',
     step: 10,
@@ -28,10 +39,10 @@ export function drawPanel(ctx, { state, aircraft, level, weather, cues }) {
     bug: aircraft.vrefKt,
     bugLabel: 'VREF',
   });
-  drawAltTape(ctx, 566, TOP, 86, HEIGHT, state, level);
-  drawVsi(ctx, 668, TOP, 92, HEIGHT, state);
-  drawGlidePath(ctx, 392, TOP, 158, HEIGHT, state);
-  drawSystems(ctx, 782, TOP, 156, HEIGHT, { state, aircraft, cues });
+  drawAltTape(ctx, R.altitude.x, R.altitude.y, R.altitude.w, R.altitude.h, state, level);
+  drawVsi(ctx, R.vsi.x, R.vsi.y, R.vsi.w, R.vsi.h, state);
+  drawGlidePath(ctx, R.path.x, R.path.y, R.path.w, R.path.h, state);
+  drawSystems(ctx, R.systems.x, R.systems.y, R.systems.w, R.systems.h, { state, aircraft, cues });
   drawAnnunciators(ctx, { state, aircraft, cues, weather });
 }
 

@@ -60,10 +60,10 @@ weather profiles, the per-aircraft control map and the 28-cell matrix.
 |----|------|------|-------|
 | T1 | S4,S6,S9 | Lateral state (bank/heading/sideslip), turn coupling, aileron and rudder controls, input remap, lateral unit tests | 1 — done `fafe587` |
 | T2 | S4,S5,S9 | De-crab at the flare, alignment as a scored factor in `classifyTouchdown`, recalibrate the 7 aircraft laterally, rewrite the playthrough autopilot | 1 — done `fafe587` |
-| T3 | S1,S2,S9 | Four weather profiles as data, physics profile plumbing (wind, gust, visibility, braking), weather-aware rendering (rain, snow, haze) and wind readouts | 2 |
-| T4 | S1,S7,S9 | 28-cell matrix: scenario data, two-axis selector, per-cell medals, per-cell landability test | 3 |
-| T5 | S3,S9 | Per-aircraft control map: only the applicable controls in the help, and a visible "not on this aircraft" response | 4 |
-| T6 | S8 | Update README, the panel's heading readout and the briefing checklist | throughout |
+| T3 | S1,S2,S9 | Four weather profiles as data, physics profile plumbing (wind, gust, visibility, braking), weather-aware rendering (rain, snow, haze) and wind readouts | 2 — done `9cd0dca` |
+| T4 | S1,S7,S9 | 28-cell matrix: scenario data, two-axis selector, per-cell medals, per-cell landability test | 3 — done `63bbfb5` |
+| T5 | S3,S9 | Per-aircraft control map: only the applicable controls in the help, and a visible "not on this aircraft" response | 4 — done `63bbfb5` |
+| T6 | S8 | Update README, the panel's heading readout and the briefing checklist | throughout — done `63bbfb5` |
 
 ## Log
 
@@ -88,3 +88,11 @@ L9 — Model correction found by the tests, worth remembering: the first formula
 L10 — Second bug found by the same probe: the autopilot computed the crab angle from ground speed while the physics drifts against the speed through the air, so a 0.5 degree error drifted the aircraft 2 ft/s sideways. Fixed in the shared test helper; a real pilot reading the tape has true airspeed, so the display and the model agree.
 
 L11 — Lateral calibration is data, not code: rollRateDegS, rollStabilityDegS, maxSideslipDeg and betaResponsePerS per aircraft. The A380 now lands on bronze with the autopilot (245 fpm, 30 ft off) while the C152 lands gold, which is the difficulty shape we wanted.
+
+L12 — T3 to T6 built. 110 tests green. The matrix playthrough flies all 28 cells through the keyboard and requires a medal on each; that is the answer to "is harder secretly impossible".
+
+L13 — Test harness bug found while probing the matrix: the shared autopilot read the crosswind from the level's default profile instead of the profile actually being flown, so nine of the twenty-eight cells "failed" on the edge purely because the crab was computed for the wrong wind. The helper now takes the active weather explicitly. Worth remembering: a test that only ever runs a level's default profile can hide this class of bug.
+
+L14 — Real unfairness fixed: the vertical gust was added to the touchdown sink, so a 180 fpm storm gust could report a hard landing the pilot never made. Gusts now fade with height above ground, which is also what happens physically.
+
+L15 — T5 decision: a control that does not exist on the airframe now answers on screen ("GEAR: FIXED ON THIS AIRCRAFT"). The briefing lists only the controls that apply, generated from the aircraft data rather than written by hand, so the list cannot drift from the model.

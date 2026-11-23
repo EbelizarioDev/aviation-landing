@@ -58,8 +58,8 @@ weather profiles, the per-aircraft control map and the 28-cell matrix.
 
 | ID | Spec | Work | Phase |
 |----|------|------|-------|
-| T1 | S4,S6,S9 | Lateral state (bank/heading/sideslip), turn coupling, aileron and rudder controls, input remap, lateral unit tests | 1 |
-| T2 | S4,S5,S9 | De-crab at the flare, alignment as a scored factor in `classifyTouchdown`, recalibrate the 7 aircraft laterally, rewrite the playthrough autopilot | 1 |
+| T1 | S4,S6,S9 | Lateral state (bank/heading/sideslip), turn coupling, aileron and rudder controls, input remap, lateral unit tests | 1 — done `fafe587` |
+| T2 | S4,S5,S9 | De-crab at the flare, alignment as a scored factor in `classifyTouchdown`, recalibrate the 7 aircraft laterally, rewrite the playthrough autopilot | 1 — done `fafe587` |
 | T3 | S1,S2,S9 | Four weather profiles as data, physics profile plumbing (wind, gust, visibility, braking), weather-aware rendering (rain, snow, haze) and wind readouts | 2 |
 | T4 | S1,S7,S9 | 28-cell matrix: scenario data, two-axis selector, per-cell medals, per-cell landability test | 3 |
 | T5 | S3,S9 | Per-aircraft control map: only the applicable controls in the help, and a visible "not on this aircraft" response | 4 |
@@ -80,3 +80,11 @@ L5 — "4 perfiles, sumando nieve/hielo" → S1 is 4 profiles, 28 cells.
 L6 — Design correction made while sizing the work: bank barely affects the glide path at approach bank angles. At 10 degrees of bank the vertical lift component falls 1.5 percent, about 11 fpm on a 740 fpm path; at 20 degrees it is 6 percent, about 45 fpm. The real new difficulty is turn planning and the de-crab at the flare, not lift loss. The spec says so rather than overselling the coupling.
 
 L7 — Rejections kept on record: difficulty tiers that remove the elevator or throttle (they amputate the skill instead of scaling it, and the rudder's only real job in an approach is crosswind correction, which belongs to the weather axis).
+
+L8 — T1 and T2 built on the user's go-ahead ("Ve comenzando con las tareas"). Test-first for the new equations, then green. 81 tests pass.
+
+L9 — Model correction found by the tests, worth remembering: the first formulation rotated the heading with the rudder and then let the sideslip decay, which made a de-crab un-landable (the A380 drifted 166 ft off the centreline and failed on the edge). The honest decomposition is flight path + sideslip: the bank turns the path, the rudder moves the nose off the path, heading = path + sideslip. With that, a de-crab keeps the ground track and the drift stops being a punishment for doing it right.
+
+L10 — Second bug found by the same probe: the autopilot computed the crab angle from ground speed while the physics drifts against the speed through the air, so a 0.5 degree error drifted the aircraft 2 ft/s sideways. Fixed in the shared test helper; a real pilot reading the tape has true airspeed, so the display and the model agree.
+
+L11 — Lateral calibration is data, not code: rollRateDegS, rollStabilityDegS, maxSideslipDeg and betaResponsePerS per aircraft. The A380 now lands on bronze with the autopilot (245 fpm, 30 ft off) while the C152 lands gold, which is the difficulty shape we wanted.

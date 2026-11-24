@@ -128,18 +128,61 @@ answers with the aircraft's real spool delay, and the 3° glide path crosses the
 threshold at 50 ft the way a real ILS does — which is why the touchdown happens
 around 950 ft of geometry plus the flare, and not on the threshold itself.
 
+## One cockpit and one model per aircraft
+
+Every airframe in the ladder has its own visual module under
+`src/render/models/`, keyed by the same id used in `src/aircraft.js`:
+`c152.js`, `c172.js`, `c208.js`, `b350.js`, `e175.js`, `b738.js`, `a388.js`.
+
+Each module exports one object with a palette, a machine-readable `signature`
+and the two draw calls the game uses:
+
+| Aircraft | Wing | Tail | Power | Gear |
+| --- | --- | --- | --- | --- |
+| Cessna 152 | high, struts | conventional | 1 piston, tractor prop | fixed |
+| Cessna 172S | high, struts | conventional | 1 piston, tractor prop | fixed |
+| Cessna 208B | high, struts | conventional, tall fin | 1 turboprop, cargo pod | fixed |
+| King Air 350 | low | **T-tail** | 2 turboprops | retractable |
+| Embraer E175 | low, wingtip fences | conventional | 2 jets | retractable |
+| Boeing 737-800 | low, blended winglets | conventional, dorsal fillet | 2 jets | retractable |
+| Airbus A380-800 | low, no winglets | conventional | 4 jets | retractable, twin-axle bogies |
+
+Inside, the difference is the shell and the controls, not the graded panel: a
+trainer has thin upright pillars, a shallow glareshield and a two-horn yoke; the
+jets add glass displays and a mode control panel; the A380 has **side-sticks**
+and no yoke at all, and four engine columns on its engine page.
+
+Two rules the modules must keep, both enforced by `test/models.test.js`:
+
+- **The graded panel is not theirs.** The cockpit module draws only inside the
+  windshield (0 to 352 px). The instruments the player reads are drawn
+  separately below it, which is why the instructor demo can still highlight an
+  instrument by name in every aircraft.
+- **Motion is honest.** Wheels appear only when the wheels are down, and a
+  fixed-gear aircraft draws the same model whatever the gear handle says.
+
+Shapes are built with the primitives in `src/render/models/shapes.js`, which
+only uses Canvas 2D calls the test harness also implements, so nothing in the
+drawing code is untested by construction.
+
 ## Tests
 
 ```sh
 npm test        # node --test test/
 ```
 
-119 tests in nine groups: the physics and grading, the projection math, a render
+128 tests in ten groups: the physics and grading, the projection math, a render
 smoke test that draws every view on every level and phase through a stub canvas
-context, the camera view toggle, the lateral model and alignment grading, the weather profiles, the 28-cell matrix, the control map per aircraft, the instructor demo, and an
-end-to-end playthrough that flies all
-seven levels through the real keyboard input path and requires each to score a
-medal.
+context, the camera view toggle, the lateral model and alignment grading, the
+weather profiles, the 28-cell matrix, the control map per aircraft, the
+instructor demo, the per-aircraft visuals, and an end-to-end playthrough that
+flies all seven levels through the real keyboard input path and requires each to
+score a medal.
+
+The canvas stub records every path call and every style assignment, so the
+visual tests can assert three things a screenshot cannot: no coordinate is
+`NaN`, no colour is `undefined`, and the cockpit shell never paints over the
+graded panel below the windshield.
 
 ## Layout
 
@@ -154,11 +197,12 @@ src/physics.js        flight model, glide path, touchdown grading
 src/game.js           game states, input, control map, scoring, per-cell bests
 src/main.js           canvas, keyboard and requestAnimationFrame wiring
 src/render/scene.js     sky, ground, runway, approach lights, PAPI (shared)
-src/render/cockpit.js   first person: the scene framed by the windshield
-src/render/chase.js     third person: chase camera and the aircraft silhouette
+src/render/cockpit.js   first person: the scene framed by the aircraft's cockpit
+src/render/chase.js     third person: chase camera, placement and roll
+src/render/models/      one cockpit and one model per airframe (see below)
 src/render/panel.js     instruments: attitude, tapes, VSI, glideslope/localizer
 src/render/minimap.js   the side profile with the glide path and your trend
 src/render/projection.js pure perspective math
-test/                 eight test groups
+test/                 ten test groups
 test/helpers/          canvas stub, autopilot, keyboard pilot
 ```

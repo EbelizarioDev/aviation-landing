@@ -11,7 +11,10 @@ export const FOCAL_PX = 520;
 export const PX_PER_DEG = 9.5;
 const NEAR_FT = 8;
 
-export function makeCamera(state, { cx, horizonY, altOffsetFt = 0, zApronFt = 0 }) {
+export function makeCamera(
+  state,
+  { cx, horizonY, altOffsetFt = 0, zApronFt = 0, rollWithBank = false, pivotY = null },
+) {
   return {
     cx,
     horizonY: horizonY + state.pitchDeg * PX_PER_DEG,
@@ -19,6 +22,11 @@ export function makeCamera(state, { cx, horizonY, altOffsetFt = 0, zApronFt = 0 
     offsetFt: state.lateralFt ?? 0,
     focal: FOCAL_PX,
     zApronFt,
+    // Banking must be visible from the pilot's seat: the eye rolls with the
+    // aircraft, so the world rotates the other way around it. Without this the
+    // ailerons produce a rate with no visual consequence.
+    rollRad: rollWithBank ? -((state.bankDeg ?? 0) * Math.PI) / 180 : 0,
+    pivotY: pivotY ?? horizonY,
   };
 }
 
@@ -30,11 +38,34 @@ export function makeCamera(state, { cx, horizonY, altOffsetFt = 0, zApronFt = 0 
  */
 export function project(cam, worldXFt, worldYFt, zFt) {
   const z = Math.max(NEAR_FT, zFt + (cam.zApronFt ?? 0));
+  const x = cam.cx + ((worldXFt - cam.offsetFt) * cam.focal) / z;
+  const y = cam.horizonY + ((cam.altFt - worldYFt) * cam.focal) / z;
+  const roll = cam.rollRad ?? 0;
+  if (roll === 0) return { x, y, scale: cam.focal / z };
+  const dx = x - cam.cx;
+  const dy = y - cam.pivotY;
+  const c = Math.cos(roll);
+  const s = Math.sin(roll);
   return {
-    x: cam.cx + ((worldXFt - cam.offsetFt) * cam.focal) / z,
-    y: cam.horizonY + ((cam.altFt - worldYFt) * cam.focal) / z,
+    x: cam.cx + dx * c - dy * s,
+    y: cam.pivotY + dx * s + dy * c,
     scale: cam.focal / z,
   };
+}
+
+/** The horizon after roll: where the sky meets the ground in this frame. */
+export function horizonLine(cam) {
+  const roll = cam.rollRad ?? 0;
+  const c = Math.cos(roll);
+  const s = Math.sin(roll);
+  const dy = cam.horizonY - cam.pivotY;
+  const px = cam.cx - dy * s;
+  const py = cam.pivotY + dy * c;
+  const far = 4000;
+  return [
+    [px - far * c, py - far * s],
+    [px + far * c, py + far * s],
+  ];
 }
 
 /** Horizontal offset of the 3 degree path at the aircraft's position. */

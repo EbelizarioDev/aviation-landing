@@ -4,25 +4,41 @@
 // The camera is rigidly attached, so the aircraft holds a fixed position in
 // frame and it is the world that moves. That is what makes attitude readable:
 // pitch moves the horizon, steering banks the silhouette.
+//
+// The airframe itself is drawn by the aircraft's visual module; this file only
+// decides where it sits, how big it is and how far it is rolled.
 
 import { clamp } from '../physics.js';
 import { VIEW, COLORS } from './layout.js';
 import { PX_PER_DEG } from './projection.js';
 import { paintExterior } from './scene.js';
+import { getVisual } from './models/index.js';
+import { drawModel, setAilerons } from './models/frame3d.js';
 
 const CAMERA_HEIGHT_FT = 24;
 const CAMERA_BEHIND_FT = 70;
 const PX_PER_DEG_ROLL = 0.9;
 
+// Span in pixels. Big enough that a trainer's struts, wheels and window count
+// are readable at 960x600 without reading a label. The upper bound is set by the
+// windshield: a model 390 px wide reaches roughly 190 px above its own centre,
+// and any span much beyond that would push the fin out of frame.
+const SPAN_BASE_PX = 240;
+const SPAN_PER_MASS_PX = 150;
+// Fraction of the span kept below the aircraft centre, so the tail end never
+// runs off the bottom of the windshield and under the panel.
+const BOTTOM_MARGIN = 0.44;
+
 /** Where the aircraft silhouette sits in the windshield, and how big it is. */
 export function aircraftScreenPose({ state, aircraft }) {
   const horizonY = VIEW.horizonBaseY + state.pitchDeg * PX_PER_DEG;
   const massFactor = clamp(aircraft.massT / 100, 0, 1);
+  const span = SPAN_BASE_PX + SPAN_PER_MASS_PX * massFactor;
   return {
     x: VIEW.width / 2,
-    y: VIEW.windshieldBottom - 70,
+    y: VIEW.windshieldBottom - BOTTOM_MARGIN * span,
     horizonY,
-    span: 64 + 60 * massFactor,
+    span,
     roll: clamp((state.bankDeg ?? 0) * PX_PER_DEG_ROLL * 2, -30, 30),
   };
 }
@@ -37,99 +53,37 @@ export function drawChase(ctx, { state, aircraft, level, weather, t }) {
     altOffsetFt: CAMERA_HEIGHT_FT,
     zApronFt: CAMERA_BEHIND_FT,
   });
-  drawAircraft(ctx, { state, aircraft });
 
-  ctx.restore();
-}
-
-function drawAircraft(ctx, { state, aircraft }) {
   const pose = aircraftScreenPose({ state, aircraft });
-  const half = pose.span / 2;
-  const onGround = Boolean(state.onGround);
+  const visual = getVisual(aircraft);
 
-  ctx.save();
-  ctx.translate(pose.x, pose.y);
-  ctx.rotate((pose.roll * Math.PI) / 180);
-
-  const body = onGround ? '#c9d1d6' : '#dfe5e9';
-  const shade = '#9aa4ab';
-  const outline = '#1d2226';
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = outline;
-
-  // Wings, swept back a little so the shape reads from behind.
-  ctx.fillStyle = body;
-  for (const side of [-1, 1]) {
-    ctx.beginPath();
-    ctx.moveTo(side * half * 0.16, -half * 0.1);
-    ctx.lineTo(side * half, half * 0.1);
-    ctx.lineTo(side * half * 0.94, half * 0.2);
-    ctx.lineTo(side * half * 0.16, half * 0.06);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+  if (visual.airframe) {
+    setAilerons(visual.airframe, state.aileronCmd);
+    // A real model, projected from 70 ft behind and 24 ft above: the tail is
+    // nearest, the fuselage is foreshortened, and banking rolls the airframe
+    // about its own axis. The anchor keeps it inside the windshield.
+    drawModel(ctx, visual.airframe, {
+      cx: pose.x,
+      horizonY: pose.horizonY,
+      anchorBottomY: VIEW.windshieldBottom - 4,
+      rollDeg: state.bankDeg ?? 0,
+    });
+  } else {
+    // Legacy flat models: placed on a fixed screen pose and rotated in 2D.
+    ctx.save();
+    ctx.translate(pose.x, pose.y);
+    ctx.rotate((pose.roll * Math.PI) / 180);
+    visual.drawExterior(ctx, { state, aircraft, pose, u: pose.span / 2 });
+    ctx.restore();
   }
-
-  // Engines under the wings: one, two or four per airframe.
-  ctx.fillStyle = shade;
-  const engines = aircraft.engines ?? 2;
-  const stations =
-    engines >= 4
-      ? [-0.58, -0.32, 0.32, 0.58]
-      : engines === 2
-        ? [-0.42, 0.42]
-        : [0];
-  for (const station of stations) {
-    const ex = station * half;
-    const ey = half * 0.16;
-    ctx.beginPath();
-    ctx.ellipse(ex, ey, half * 0.09, half * 0.14, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-  }
-
-  // Horizontal stabiliser, nearest to the camera at the bottom of the frame.
-  ctx.fillStyle = body;
-  ctx.beginPath();
-  ctx.moveTo(0, half * 0.34);
-  ctx.lineTo(half * 0.44, half * 0.62);
-  ctx.lineTo(half * 0.44, half * 0.68);
-  ctx.lineTo(0, half * 0.5);
-  ctx.lineTo(-half * 0.44, half * 0.68);
-  ctx.lineTo(-half * 0.44, half * 0.62);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Vertical fin.
-  ctx.beginPath();
-  ctx.moveTo(-half * 0.05, -half * 0.28);
-  ctx.lineTo(0, -half * 0.78);
-  ctx.lineTo(half * 0.05, -half * 0.28);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Fuselage.
-  ctx.fillStyle = body;
-  ctx.beginPath();
-  ctx.ellipse(0, half * 0.06, half * 0.19, half * 0.46, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  // Nav lights: red left, green right. Cheap, and they fix orientation at a glance.
-  ctx.fillStyle = '#e2402f';
-  ctx.fillRect(-half - 2, half * 0.08, 5, 4);
-  ctx.fillStyle = '#4cd07a';
-  ctx.fillRect(half - 3, half * 0.08, 5, 4);
-
-  ctx.restore();
 
   // On the ground, a contact line at the wheels. No flying shadow: a camera 24 ft
   // above the aircraft would put the ground under it off the bottom of the
   // windshield, so a shadow would be a lie. Height is the minimap's job.
-  if (onGround) {
+  if (state.onGround) {
     ctx.fillStyle = COLORS.dim;
-    ctx.fillRect(pose.x - half, pose.y + half * 0.52, half * 2, 3);
+    ctx.fillRect(pose.x - pose.span / 2, pose.y + pose.span * 0.26, pose.span, 3);
   }
+
+  ctx.restore();
 }

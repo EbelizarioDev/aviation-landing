@@ -4,7 +4,7 @@
 import { FEET_PER_M, RUNWAY_HALF_WIDTH_FT } from '../physics.js';
 import { VIEW, COLORS } from './layout.js';
 import { hazeAmount } from '../weather.js';
-import { makeCamera, project, papiWhiteCount } from './projection.js';
+import { makeCamera, project, papiWhiteCount, horizonLine } from './projection.js';
 
 const HALF_WIDTH_FT = RUNWAY_HALF_WIDTH_FT;
 const RUNWAY_EDGE_LIGHT_SPACING_FT = 200;
@@ -23,6 +23,8 @@ export function paintExterior(ctx, { state, aircraft, level, weather, t = 0 }, o
     horizonY: VIEW.horizonBaseY,
     altOffsetFt: options.altOffsetFt ?? 0,
     zApronFt: options.zApronFt ?? 0,
+    rollWithBank: options.rollWithBank ?? false,
+    pivotY: options.pivotY,
   });
 
   drawSky(ctx, cam, w, h);
@@ -34,56 +36,46 @@ export function paintExterior(ctx, { state, aircraft, level, weather, t = 0 }, o
   return cam;
 }
 
-/** The cockpit window frame: only for the view from inside. */
-export function drawWindshieldFrame(ctx) {
-  const w = VIEW.width;
-  const h = VIEW.windshieldBottom;
-  ctx.fillStyle = COLORS.frame;
-  ctx.fillRect(0, 0, w, 12);
-  ctx.fillRect(0, h - 26, w, 26);
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(58, 0);
-  ctx.lineTo(112, h);
-  ctx.lineTo(0, h);
-  ctx.closePath();
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(w, 0);
-  ctx.lineTo(w - 58, 0);
-  ctx.lineTo(w - 112, h);
-  ctx.lineTo(w, h);
-  ctx.closePath();
-  ctx.fill();
-}
+// The cockpit window frame used to live here, shared by every aircraft. It now
+// belongs to each aircraft's visual module (src/render/models/).
 
 function drawSky(ctx, cam, w, h) {
-  const horizon = Math.max(-h, Math.min(h * 2, cam.horizonY));
-  const grad = ctx.createLinearGradient(0, Math.min(0, horizon - h), 0, horizon);
+  // The sky fills the whole windshield. The ground is then painted on top as a
+  // polygon bounded by the (possibly rolled) horizon, so a banked aircraft never
+  // exposes an uncovered corner.
+  const grad = ctx.createLinearGradient(0, 0, 0, Math.max(40, cam.horizonY));
   grad.addColorStop(0, COLORS.skyTop);
   grad.addColorStop(1, COLORS.skyHorizon);
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, w, Math.max(0, horizon));
+  ctx.fillRect(0, 0, w, h);
   ctx.fillStyle = 'rgba(255,255,255,0.10)';
   for (let i = 0; i < 5; i++) {
-    const y = horizon - 40 - i * 46;
+    const y = cam.horizonY - 40 - i * 46;
     if (y < -20) break;
     ctx.fillRect(0, y, w, 9);
   }
 }
 
 function drawGround(ctx, cam, w, h) {
-  const top = Math.max(0, Math.min(h, cam.horizonY));
-  const grad = ctx.createLinearGradient(0, top, 0, h);
+  const [a, b] = horizonLine(cam);
+  const below = 4000;
+  const grad = ctx.createLinearGradient(0, cam.horizonY, 0, cam.horizonY + h);
   grad.addColorStop(0, COLORS.groundFar);
   grad.addColorStop(1, COLORS.ground);
   ctx.fillStyle = grad;
-  ctx.fillRect(0, top, w, h - top);
+  ctx.beginPath();
+  ctx.moveTo(a[0], a[1]);
+  ctx.lineTo(b[0], b[1]);
+  ctx.lineTo(b[0], b[1] + below);
+  ctx.lineTo(a[0], a[1] + below);
+  ctx.closePath();
+  ctx.fill();
+
   ctx.strokeStyle = 'rgba(0,0,0,0.35)';
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(0, top);
-  ctx.lineTo(w, top);
+  ctx.moveTo(a[0], a[1]);
+  ctx.lineTo(b[0], b[1]);
   ctx.stroke();
 }
 

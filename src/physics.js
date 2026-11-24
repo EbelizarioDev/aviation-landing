@@ -185,6 +185,9 @@ export function step(aircraft, s, controls, dt) {
   // --- lateral: the aileron banks, the bank turns, the rudder yaws the nose.
   const aileron = clamp(controls.aileron ?? 0, -1, 1);
   const rudder = clamp(controls.rudder ?? 0, -1, 1);
+  // Kept on the state because the airframe draws the ailerons where this says:
+  // a control surface that never moves makes the input feel decorative.
+  next.aileronCmd = aileron;
   if (Math.abs(aileron) > 0.01) {
     const rollRate = aircraft.rollRateDegS ?? ROLL_RATE_DEG_S;
     next.bankDeg = clamp(s.bankDeg + aileron * rollRate * dt, -MAX_BANK_DEG, MAX_BANK_DEG);
